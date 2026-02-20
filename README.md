@@ -21,10 +21,10 @@ cargo build --release
 ## Roadmap
 
 1. ~~**Static file server**~~ ✅ — Serve raw files from a directory over HTTP on localhost. CLI takes a directory path argument.
-2. **Markdown-to-HTML rendering** — When a `.md` file is requested, convert it to HTML on the fly and serve a complete HTML page.
-3. **Directory listing** — When a directory is requested, return an HTML page listing its contents with navigable links.
-4. **HTML styling** — Apply a clean, readable stylesheet to rendered Markdown pages and directory listings.
-5. **Extended Markdown** — Tables, task lists, and other extensions beyond the core CommonMark subset.
+2. ~~**Markdown-to-HTML rendering**~~ ✅ — When a `.md` file is requested, convert it to HTML on the fly and serve a complete HTML page.
+3. ~~**Directory listing**~~ ✅ — When a directory is requested, return an HTML page listing its contents with navigable links.
+4. ~~**HTML styling**~~ ✅ — Apply a clean, readable stylesheet to rendered Markdown pages and directory listings.
+5. ~~**Markdown tables**~~ ✅ — GFM-style table support with column alignment.
 
 ## Design Goals
 
