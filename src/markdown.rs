@@ -575,18 +575,33 @@ mod tests {
     #[test]
     fn test_heading_with_angle_brackets() {
         let body = render_body("# rd::expected<void, E>");
-        assert!(body.contains("<h1>rd::expected&lt;void, E&gt;</h1>"), "got: {}", body);
+        assert!(
+            body.contains("<h1>rd::expected&lt;void, E&gt;</h1>"),
+            "got: {}",
+            body
+        );
         // Must NOT double-escape to &amp;lt;
         assert!(!body.contains("&amp;"), "double-escaped: {}", body);
     }
 
     #[test]
     fn test_render_no_double_escape() {
-        let page = render("# rd::expected<void, E>\n\nSome text with <html> & \"quotes\"", "test.md");
+        let page = render(
+            "# rd::expected<void, E>\n\nSome text with <html> & \"quotes\"",
+            "test.md",
+        );
         // Title should be escaped once
-        assert!(page.contains("<title>rd::expected&lt;void, E&gt;</title>"), "title: {}", page);
+        assert!(
+            page.contains("<title>rd::expected&lt;void, E&gt;</title>"),
+            "title: {}",
+            page
+        );
         // Body heading should be escaped once
-        assert!(page.contains("<h1>rd::expected&lt;void, E&gt;</h1>"), "heading: {}", page);
+        assert!(
+            page.contains("<h1>rd::expected&lt;void, E&gt;</h1>"),
+            "heading: {}",
+            page
+        );
         // Paragraph should be escaped once
         assert!(page.contains("&lt;html&gt;"), "html in para: {}", page);
         assert!(page.contains("&amp;"), "amp in para: {}", page);

@@ -1,22 +1,35 @@
 use std::path::{Path, PathBuf};
 
+/// Result of resolving a URL path against the root directory.
+pub enum ResolvedPath {
+    File(PathBuf),
+    Directory(PathBuf),
+}
+
 /// Resolves a URL path against the root directory, preventing directory traversal.
 /// Returns None if the resolved path escapes the root or doesn't exist.
-pub fn resolve_path(root: &Path, url_path: &str) -> Option<PathBuf> {
+pub fn resolve_path(root: &Path, url_path: &str) -> Option<ResolvedPath> {
     let decoded = percent_decode(url_path);
-    // Strip leading slash and normalize
     let relative = decoded.trim_start_matches('/');
+
+    let root_canonical = root.canonicalize().ok()?;
+
     if relative.is_empty() {
-        return None;
+        return Some(ResolvedPath::Directory(root_canonical));
     }
 
     let candidate = root.join(relative);
     let canonical = candidate.canonicalize().ok()?;
-    let root_canonical = root.canonicalize().ok()?;
 
     // Security: ensure resolved path is within root
-    if canonical.starts_with(&root_canonical) && canonical.is_file() {
-        Some(canonical)
+    if !canonical.starts_with(&root_canonical) {
+        return None;
+    }
+
+    if canonical.is_file() {
+        Some(ResolvedPath::File(canonical))
+    } else if canonical.is_dir() {
+        Some(ResolvedPath::Directory(canonical))
     } else {
         None
     }
@@ -66,14 +79,14 @@ mod tests {
     fn resolves_simple_file() {
         let dir = setup_test_dir();
         let result = resolve_path(dir.path(), "/hello.txt");
-        assert!(result.is_some());
+        assert!(matches!(result, Some(ResolvedPath::File(_))));
     }
 
     #[test]
     fn resolves_nested_file() {
         let dir = setup_test_dir();
         let result = resolve_path(dir.path(), "/sub/nested.txt");
-        assert!(result.is_some());
+        assert!(matches!(result, Some(ResolvedPath::File(_))));
     }
 
     #[test]
@@ -98,9 +111,23 @@ mod tests {
     }
 
     #[test]
-    fn rejects_empty_path() {
+    fn resolves_root_as_directory() {
         let dir = setup_test_dir();
         let result = resolve_path(dir.path(), "/");
+        assert!(matches!(result, Some(ResolvedPath::Directory(_))));
+    }
+
+    #[test]
+    fn resolves_subdirectory() {
+        let dir = setup_test_dir();
+        let result = resolve_path(dir.path(), "/sub");
+        assert!(matches!(result, Some(ResolvedPath::Directory(_))));
+    }
+
+    #[test]
+    fn rejects_directory_traversal_for_dirs() {
+        let dir = setup_test_dir();
+        let result = resolve_path(dir.path(), "/../../../etc");
         assert!(result.is_none());
     }
 
@@ -109,7 +136,7 @@ mod tests {
         let dir = setup_test_dir();
         fs::write(dir.path().join("my file.txt"), "space").unwrap();
         let result = resolve_path(dir.path(), "/my%20file.txt");
-        assert!(result.is_some());
+        assert!(matches!(result, Some(ResolvedPath::File(_))));
     }
 }
 
