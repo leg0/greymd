@@ -27,9 +27,9 @@ cargo test [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECH
 Rust 2024 edition (rustc 1.85+): Follow standard conventions
 
 ## Recent Changes
+- 005-markdown-tables: Added Rust 2024 edition (rustc 1.91.1) + None (zero external crates)
 - 004-html-styling: Added Rust 2024 edition (rustc 1.91.1) + None (zero external crates)
 - 003-directory-listing: Added Rust 2024 (edition 2024, rustc 1.91.1) + None (zero external crates)
-- 002-markdown-rendering: Added Rust 2024 (edition 2024, rustc 1.91.1) + None (zero external crates)
 
 
 <!-- MANUAL ADDITIONS START -->

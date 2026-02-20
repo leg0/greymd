@@ -74,6 +74,9 @@ hr {
     margin: 1.5em 0;
 }
 img { max-width: 100%; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #e1e4e8; padding: 0.5em 0.75em; vertical-align: top; }
+th { background: #f6f8fa; font-weight: 600; text-align: left; }
 "#;
 
 pub fn wrap_html_page(title: &str, body: &str) -> String {
@@ -244,6 +247,110 @@ struct ListEntry {
     indent: usize,
 }
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+enum Alignment {
+    Left,
+    Center,
+    Right,
+}
+
+fn is_table_separator(line: &str) -> bool {
+    let trimmed = line.trim();
+    let cells = split_table_cells(trimmed);
+    if cells.is_empty() {
+        return false;
+    }
+    cells.iter().all(|cell| {
+        let c = cell.trim();
+        if c.is_empty() {
+            return false;
+        }
+        let c = c.strip_prefix(':').unwrap_or(c);
+        let c = c.strip_suffix(':').unwrap_or(c);
+        !c.is_empty() && c.chars().all(|ch| ch == '-')
+    })
+}
+
+fn parse_alignment(separator: &str) -> Vec<Alignment> {
+    split_table_cells(separator)
+        .iter()
+        .map(|cell| {
+            let c = cell.trim();
+            let left = c.starts_with(':');
+            let right = c.ends_with(':');
+            match (left, right) {
+                (true, true) => Alignment::Center,
+                (false, true) => Alignment::Right,
+                _ => Alignment::Left,
+            }
+        })
+        .collect()
+}
+
+fn split_table_cells(line: &str) -> Vec<&str> {
+    let trimmed = line.trim();
+    // Strip leading/trailing pipes
+    let inner = trimmed.strip_prefix('|').unwrap_or(trimmed);
+    let inner = inner.strip_suffix('|').unwrap_or(inner);
+
+    let mut cells = Vec::new();
+    let mut start = 0;
+    let bytes = inner.as_bytes();
+    let mut in_code = false;
+    let mut idx = 0;
+
+    while idx < bytes.len() {
+        if bytes[idx] == b'`' {
+            in_code = !in_code;
+        } else if bytes[idx] == b'|' && !in_code {
+            cells.push(inner[start..idx].trim());
+            start = idx + 1;
+        }
+        idx += 1;
+    }
+    cells.push(inner[start..].trim());
+    cells
+}
+
+fn render_table(header: &str, separator: &str, data_rows: &[&str]) -> String {
+    let alignments = parse_alignment(separator);
+    let headers = split_table_cells(header);
+    let col_count = headers.len();
+
+    let mut out = String::new();
+    out.push_str("<table>\n<thead>\n<tr>\n");
+
+    for (i, h) in headers.iter().enumerate() {
+        let align = alignments.get(i).copied().unwrap_or(Alignment::Left);
+        let style = alignment_style(align);
+        out.push_str(&format!("<th{}>{}</th>\n", style, render_inline(h)));
+    }
+    out.push_str("</tr>\n</thead>\n<tbody>\n");
+
+    for row in data_rows {
+        let cells = split_table_cells(row);
+        out.push_str("<tr>\n");
+        for i in 0..col_count {
+            let align = alignments.get(i).copied().unwrap_or(Alignment::Left);
+            let style = alignment_style(align);
+            let content = if i < cells.len() { cells[i] } else { "" };
+            out.push_str(&format!("<td{}>{}</td>\n", style, render_inline(content)));
+        }
+        out.push_str("</tr>\n");
+    }
+
+    out.push_str("</tbody>\n</table>\n");
+    out
+}
+
+fn alignment_style(align: Alignment) -> String {
+    match align {
+        Alignment::Left => String::new(),
+        Alignment::Center => " style=\"text-align: center\"".to_string(),
+        Alignment::Right => " style=\"text-align: right\"".to_string(),
+    }
+}
+
 /// Render Markdown source to a complete HTML5 page.
 pub fn render(source: &str, filename: &str) -> String {
     let title = extract_title(source, filename);
@@ -394,6 +501,27 @@ fn render_body(source: &str) -> String {
             code_buf.push_str(&line[4..]);
             state = BlockState::IndentedCode;
             i += 1;
+            continue;
+        }
+
+        // Table: current line has pipe, next line is separator
+        if trimmed.contains('|') && i + 1 < lines.len() && is_table_separator(lines[i + 1]) {
+            flush_paragraph(&mut out, &mut para_buf, &mut state);
+            close_all_lists(&mut out, &mut list_stack);
+            let header = trimmed;
+            let separator = lines[i + 1].trim();
+            let mut data_rows: Vec<&str> = Vec::new();
+            let mut j = i + 2;
+            while j < lines.len() {
+                let row = lines[j].trim();
+                if row.is_empty() || !row.contains('|') {
+                    break;
+                }
+                data_rows.push(row);
+                j += 1;
+            }
+            out.push_str(&render_table(header, separator, &data_rows));
+            i = j;
             continue;
         }
 
@@ -941,5 +1069,191 @@ mod tests {
     fn test_html_escaping_in_list_item() {
         let body = render_body("- item with <html> & stuff");
         assert!(body.contains("<li>item with &lt;html&gt; &amp; stuff</li>"));
+    }
+
+    // ===== Table Tests =====
+
+    // Phase 2: Foundational helpers
+
+    #[test]
+    fn test_is_table_separator_valid() {
+        assert!(is_table_separator("|---|---|"));
+        assert!(is_table_separator("| :--- | ---: | :---: |"));
+        assert!(is_table_separator("---|---"));
+        assert!(is_table_separator("|:---|:---:|---:|"));
+    }
+
+    #[test]
+    fn test_is_table_separator_invalid() {
+        assert!(!is_table_separator("| no dashes |"));
+        assert!(!is_table_separator("just some text"));
+        assert!(!is_table_separator("| |"));
+        assert!(!is_table_separator("||"));
+    }
+
+    #[test]
+    fn test_split_table_cells_basic() {
+        let cells = split_table_cells("| a | b | c |");
+        assert_eq!(cells, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_split_table_cells_no_outer_pipes() {
+        let cells = split_table_cells("a | b | c");
+        assert_eq!(cells, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_split_table_cells_pipe_in_code() {
+        let cells = split_table_cells("| `a|b` | c |");
+        assert_eq!(cells, vec!["`a|b`", "c"]);
+    }
+
+    #[test]
+    fn test_split_table_cells_empty_cell() {
+        let cells = split_table_cells("| a || c |");
+        assert_eq!(cells, vec!["a", "", "c"]);
+    }
+
+    #[test]
+    fn test_parse_alignment() {
+        let aligns = parse_alignment("| :--- | ---: | :---: | --- |");
+        assert_eq!(aligns.len(), 4);
+        assert_eq!(aligns[0], Alignment::Left);
+        assert_eq!(aligns[1], Alignment::Right);
+        assert_eq!(aligns[2], Alignment::Center);
+        assert_eq!(aligns[3], Alignment::Left);
+    }
+
+    // Phase 3: US1 — Basic Tables
+
+    #[test]
+    fn test_table_basic() {
+        let body = render_body("| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |");
+        assert!(body.contains("<table>"));
+        assert!(body.contains("<thead>"));
+        assert!(body.contains("<tbody>"));
+        assert!(body.contains("<th>A</th>"));
+        assert!(body.contains("<th>B</th>"));
+        assert!(body.contains("<th>C</th>"));
+        assert!(body.contains("<td>1</td>"));
+        assert!(body.contains("<td>6</td>"));
+    }
+
+    #[test]
+    fn test_table_inline_formatting() {
+        let body = render_body("| H |\n|---|\n| **bold** |\n| `code` |\n| [link](url) |");
+        assert!(body.contains("<td><strong>bold</strong></td>"));
+        assert!(body.contains("<td><code>code</code></td>"));
+        assert!(body.contains("<td><a href=\"url\">link</a></td>"));
+    }
+
+    #[test]
+    fn test_table_header_only() {
+        let body = render_body("| A | B |\n|---|---|");
+        assert!(body.contains("<table>"));
+        assert!(body.contains("<th>A</th>"));
+        assert!(body.contains("<th>B</th>"));
+        assert!(body.contains("<tbody>"));
+    }
+
+    #[test]
+    fn test_no_table_without_separator() {
+        let body = render_body("| A | B |\n| 1 | 2 |");
+        assert!(!body.contains("<table>"));
+        assert!(body.contains("<p>"));
+    }
+
+    #[test]
+    fn test_table_followed_by_paragraph() {
+        let body = render_body("| A |\n|---|\n| 1 |\n\nSome text after.");
+        assert!(body.contains("<table>"));
+        assert!(body.contains("</table>"));
+        assert!(body.contains("<p>Some text after.</p>"));
+    }
+
+    #[test]
+    fn test_table_preceded_by_heading() {
+        let body = render_body("# Title\n\n| A |\n|---|\n| 1 |");
+        assert!(body.contains("<h1>Title</h1>"));
+        assert!(body.contains("<table>"));
+        assert!(body.contains("<td>1</td>"));
+    }
+
+    // Phase 4: US2 — Column Alignment
+
+    #[test]
+    fn test_table_alignment() {
+        let body = render_body("| L | C | R |\n| :--- | :---: | ---: |\n| a | b | c |");
+        assert!(body.contains("<th>L</th>"));
+        assert!(body.contains("<th style=\"text-align: center\">C</th>"));
+        assert!(body.contains("<th style=\"text-align: right\">R</th>"));
+        assert!(body.contains("<td style=\"text-align: center\">b</td>"));
+        assert!(body.contains("<td style=\"text-align: right\">c</td>"));
+    }
+
+    #[test]
+    fn test_table_default_alignment_no_style() {
+        let body = render_body("| A |\n|---|\n| 1 |");
+        // Default (left) alignment should not have style attribute
+        assert!(body.contains("<th>A</th>"));
+        assert!(body.contains("<td>1</td>"));
+        assert!(!body.contains("text-align: left"));
+    }
+
+    // Phase 5: US3 — Styled Tables (CSS)
+
+    #[test]
+    fn test_css_contains_table_rules() {
+        let page = wrap_html_page("Test", "");
+        assert!(page.contains("table {"));
+        assert!(page.contains("border-collapse: collapse"));
+        assert!(page.contains("th, td {"));
+        assert!(page.contains("border: 1px solid"));
+    }
+
+    // Phase 6: Edge Cases
+
+    #[test]
+    fn test_table_fewer_columns_pads() {
+        let body = render_body("| A | B | C |\n|---|---|---|\n| 1 |");
+        // Row has 1 column, header has 3 — should pad with empty cells
+        assert!(body.contains("<td>1</td>"));
+        let td_count = body.matches("<td>").count();
+        assert_eq!(td_count, 3); // 1 content + 2 empty
+    }
+
+    #[test]
+    fn test_table_more_columns_truncates() {
+        let body = render_body("| A | B |\n|---|---|\n| 1 | 2 | 3 | 4 |");
+        // Row has 4 columns, header has 2 — should truncate to 2
+        let td_count = body.matches("<td>").count();
+        assert_eq!(td_count, 2);
+        assert!(!body.contains("<td>3</td>"));
+    }
+
+    #[test]
+    fn test_table_empty_cells() {
+        let body = render_body("| A | B | C |\n|---|---|---|\n| 1 || 3 |");
+        assert!(body.contains("<td>1</td>"));
+        assert!(body.contains("<td></td>")); // empty cell
+        assert!(body.contains("<td>3</td>"));
+    }
+
+    #[test]
+    fn test_table_pipe_in_code_cell() {
+        let body = render_body("| Code |\n|---|\n| `a|b` |");
+        assert!(body.contains("<code>a|b</code>"));
+        // Should be one cell, not split at the pipe
+        let td_count = body.matches("<td>").count();
+        assert_eq!(td_count, 1);
+    }
+
+    #[test]
+    fn test_table_no_outer_pipes() {
+        let body = render_body("A | B\n---|---\n1 | 2");
+        assert!(body.contains("<table>"));
+        assert!(body.contains("<th>A</th>"));
+        assert!(body.contains("<td>2</td>"));
     }
 }
