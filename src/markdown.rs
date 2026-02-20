@@ -19,10 +19,68 @@ pub fn escape_html(text: &str) -> String {
 }
 
 /// Wrap rendered HTML body in a complete HTML5 page.
+/// Embedded CSS stylesheet for all HTML pages.
+const CSS: &str = r#"
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    font-size: 16px;
+    line-height: 1.6;
+    color: #24292e;
+    max-width: 48em;
+    margin: 0 auto;
+    padding: 1em 2em;
+}
+h1, h2, h3, h4, h5, h6 { margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1em; }
+h5 { font-size: 0.875em; }
+h6 { font-size: 0.85em; color: #6a737d; }
+p { margin: 0.5em 0 1em; }
+a { color: #0366d6; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.9em;
+    background: #f0f0f0;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+}
+pre {
+    background: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 1em;
+    overflow-x: auto;
+    line-height: 1.45;
+}
+pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.9em;
+}
+blockquote {
+    border-left: 4px solid #dfe2e5;
+    padding: 0.5em 1em;
+    margin: 1em 0;
+    color: #6a737d;
+}
+ul, ol { padding-left: 2em; }
+li { padding: 0.25em 0; }
+hr {
+    border: none;
+    border-top: 1px solid #e1e4e8;
+    margin: 1.5em 0;
+}
+img { max-width: 100%; }
+"#;
+
 pub fn wrap_html_page(title: &str, body: &str) -> String {
     format!(
-        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>{}</title>\n</head>\n<body>{}</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{}</style>\n</head>\n<body>{}</body>\n</html>\n",
         escape_html(title),
+        CSS,
         body
     )
 }
@@ -538,12 +596,72 @@ mod tests {
         assert!(page.contains("<p>hello</p>"));
         assert!(page.contains("<meta charset=\"utf-8\">"));
         assert!(page.contains("</html>"));
+        // Styling additions
+        assert!(page.contains("<style>"));
+        assert!(page.contains("</style>"));
+        assert!(
+            page.contains(
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+            )
+        );
     }
 
     #[test]
     fn test_wrap_html_page_empty_body() {
         let page = wrap_html_page("Empty", "");
-        assert!(page.contains("<body></body>") || page.contains("<body>\n</body>"));
+        assert!(page.contains("<body></body>"));
+        assert!(page.contains("<style>"));
+    }
+
+    #[test]
+    fn test_wrap_html_page_contains_style_block() {
+        let page = wrap_html_page("Test", "<p>hi</p>");
+        assert!(page.contains("<style>"));
+        assert!(page.contains("</style>"));
+    }
+
+    #[test]
+    fn test_wrap_html_page_contains_viewport_meta() {
+        let page = wrap_html_page("Test", "");
+        assert!(page.contains("name=\"viewport\""));
+        assert!(page.contains("width=device-width"));
+    }
+
+    #[test]
+    fn test_wrap_html_page_no_external_css() {
+        let page = wrap_html_page("Test", "");
+        assert!(!page.contains("<link"));
+        assert!(!page.contains("@import"));
+    }
+
+    #[test]
+    fn test_css_contains_typography_rules() {
+        let page = wrap_html_page("Test", "");
+        assert!(page.contains("font-family:"));
+        assert!(page.contains("max-width:"));
+        assert!(page.contains("line-height:"));
+    }
+
+    #[test]
+    fn test_css_contains_element_rules() {
+        let page = wrap_html_page("Test", "");
+        // Headings
+        assert!(page.contains("h1"));
+        assert!(page.contains("h6"));
+        // Code
+        assert!(page.contains("pre {"));
+        assert!(page.contains("code {"));
+        assert!(page.contains("overflow-x: auto"));
+        // Links
+        assert!(page.contains("a {"));
+        assert!(page.contains("#0366d6"));
+        // Blockquotes
+        assert!(page.contains("blockquote"));
+        assert!(page.contains("#dfe2e5"));
+        // HR
+        assert!(page.contains("hr {"));
+        // Images
+        assert!(page.contains("img {"));
     }
 
     #[test]

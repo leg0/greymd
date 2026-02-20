@@ -372,4 +372,61 @@ mod tests {
         assert!(resp.contains("Index of /"));
         assert!(!resp.contains("<ul>"));
     }
+
+    // Spec 4: HTML Styling integration tests
+
+    #[test]
+    fn markdown_page_has_style_block() {
+        let dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(dir.path().join("doc.md"), "# Test").unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/doc.md");
+        assert!(resp.contains("<style>"));
+        assert!(resp.contains("</style>"));
+        assert!(resp.contains("name=\"viewport\""));
+    }
+
+    #[test]
+    fn directory_listing_has_style_block() {
+        let dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(dir.path().join("a.md"), "# A").unwrap();
+        std::fs::write(dir.path().join("b.md"), "# B").unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/");
+        assert!(resp.contains("<style>"));
+        assert!(resp.contains("</style>"));
+        assert!(resp.contains("name=\"viewport\""));
+    }
+
+    #[test]
+    fn markdown_and_listing_share_same_style() {
+        let dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(dir.path().join("a.md"), "# A").unwrap();
+        std::fs::write(dir.path().join("b.md"), "# B").unwrap();
+        let port = start_server(dir.path());
+
+        let md_resp = get(port, "/a.md");
+        let listing_resp = get(port, "/");
+
+        // Extract <style>...</style> from both
+        let md_style = md_resp
+            .split("<style>")
+            .nth(1)
+            .and_then(|s| s.split("</style>").next());
+        let listing_style = listing_resp
+            .split("<style>")
+            .nth(1)
+            .and_then(|s| s.split("</style>").next());
+        assert!(md_style.is_some());
+        assert_eq!(md_style, listing_style);
+    }
+
+    #[test]
+    fn css_contains_max_width() {
+        let dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(dir.path().join("doc.md"), "# Test").unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/doc.md");
+        assert!(resp.contains("max-width"));
+    }
 }
