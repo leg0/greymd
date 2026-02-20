@@ -1,4 +1,5 @@
 mod http;
+mod markdown;
 mod mime;
 mod path;
 mod server;

@@ -40,13 +40,27 @@ fn handle_connection(stream: &std::net::TcpStream, root: &Path) {
         HttpResponse::method_not_allowed()
     } else {
         match resolve_path(root, &request.path) {
-            Some(file_path) => match std::fs::read(&file_path) {
-                Ok(contents) => {
-                    let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                    HttpResponse::ok(content_type_for(ext), contents)
+            Some(file_path) => {
+                let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                if ext.eq_ignore_ascii_case("md") {
+                    match std::fs::read_to_string(&file_path) {
+                        Ok(source) => {
+                            let filename = file_path
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("untitled.md");
+                            let html = crate::markdown::render(&source, filename);
+                            HttpResponse::ok("text/html", html.into_bytes())
+                        }
+                        Err(_) => HttpResponse::not_found(),
+                    }
+                } else {
+                    match std::fs::read(&file_path) {
+                        Ok(contents) => HttpResponse::ok(content_type_for(ext), contents),
+                        Err(_) => HttpResponse::not_found(),
+                    }
                 }
-                Err(_) => HttpResponse::not_found(),
-            },
+            }
             None => HttpResponse::not_found(),
         }
     };
@@ -185,5 +199,41 @@ mod tests {
         // Try binding again — should fail
         let result = TcpListener::bind(format!("127.0.0.1:{}", port));
         assert!(result.is_err());
+    }
+
+    // US1+US2: Markdown rendering integration tests
+
+    #[test]
+    fn serves_markdown_as_html() {
+        let dir = setup_test_dir();
+        std::fs::write(dir.path().join("doc.md"), "# Hello\n\nWorld").unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/doc.md");
+        assert!(resp.contains("HTTP/1.1 200 OK"));
+        assert!(resp.contains("Content-Type: text/html"));
+        assert!(resp.contains("<!DOCTYPE html>"));
+        assert!(resp.contains("<h1>Hello</h1>"));
+        assert!(resp.contains("<p>World</p>"));
+    }
+
+    // US2: Non-markdown files unchanged
+    #[test]
+    fn html_files_served_raw_not_wrapped() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, "/page.html");
+        assert!(resp.contains("HTTP/1.1 200 OK"));
+        assert!(resp.contains("<h1>Page</h1>"));
+        // Must NOT be double-wrapped in <!DOCTYPE>
+        assert!(!resp.contains("<!DOCTYPE html>"));
+    }
+
+    #[test]
+    fn txt_files_served_raw() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, "/hello.txt");
+        assert!(resp.contains("hello world"));
+        assert!(!resp.contains("<!DOCTYPE html>"));
     }
 }
