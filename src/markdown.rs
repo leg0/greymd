@@ -394,9 +394,11 @@ fn render_body(source: &str) -> String {
         if let Some((level, text)) = parse_heading(trimmed) {
             flush_paragraph(&mut out, &mut para_buf, &mut state);
             close_all_lists(&mut out, &mut list_stack);
+            let slug = heading_slug(text);
             out.push_str(&format!(
-                "<h{}>{}</h{}>\n",
+                "<h{} id=\"{}\">{}</h{}>\n",
                 level,
+                slug,
                 render_inline(text),
                 level
             ));
@@ -534,6 +536,22 @@ fn parse_heading(line: &str) -> Option<(u8, &str)> {
     } else {
         None
     }
+}
+
+/// Generate a GFM-style anchor slug from heading text.
+fn heading_slug(text: &str) -> String {
+    text.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c.to_ascii_lowercase()
+            } else if c == ' ' || c == '-' {
+                '-'
+            } else {
+                '\0'
+            }
+        })
+        .filter(|&c| c != '\0')
+        .collect()
 }
 
 fn is_horizontal_rule(line: &str) -> bool {
@@ -765,14 +783,14 @@ mod tests {
     #[test]
     fn test_heading_h1() {
         let body = render_body("# Hello");
-        assert_eq!(body.trim(), "<h1>Hello</h1>");
+        assert_eq!(body.trim(), "<h1 id=\"hello\">Hello</h1>");
     }
 
     #[test]
     fn test_heading_with_angle_brackets() {
         let body = render_body("# rd::expected<void, E>");
         assert!(
-            body.contains("<h1>rd::expected&lt;void, E&gt;</h1>"),
+            body.contains("<h1 id=\"rdexpectedvoid-e\">rd::expected&lt;void, E&gt;</h1>"),
             "got: {}",
             body
         );
@@ -795,7 +813,7 @@ mod tests {
         );
         // Body heading should be escaped once
         assert!(
-            page.contains("<h1>rd::expected&lt;void, E&gt;</h1>"),
+            page.contains("<h1 id=\"rdexpectedvoid-e\">rd::expected&lt;void, E&gt;</h1>"),
             "heading: {}",
             page
         );
@@ -810,11 +828,11 @@ mod tests {
 
     #[test]
     fn test_heading_h2_through_h6() {
-        assert!(render_body("## Sub").contains("<h2>Sub</h2>"));
-        assert!(render_body("### Sub").contains("<h3>Sub</h3>"));
-        assert!(render_body("#### Sub").contains("<h4>Sub</h4>"));
-        assert!(render_body("##### Sub").contains("<h5>Sub</h5>"));
-        assert!(render_body("###### Sub").contains("<h6>Sub</h6>"));
+        assert!(render_body("## Sub").contains("<h2 id=\"sub\">Sub</h2>"));
+        assert!(render_body("### Sub").contains("<h3 id=\"sub\">Sub</h3>"));
+        assert!(render_body("#### Sub").contains("<h4 id=\"sub\">Sub</h4>"));
+        assert!(render_body("##### Sub").contains("<h5 id=\"sub\">Sub</h5>"));
+        assert!(render_body("###### Sub").contains("<h6 id=\"sub\">Sub</h6>"));
     }
 
     // === US1: Paragraph rendering ===
@@ -909,7 +927,7 @@ mod tests {
         let page = render("# Test\n\nHello world", "test.md", "testprefix");
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>Test</title>"));
-        assert!(page.contains("<h1>Test</h1>"));
+        assert!(page.contains("<h1 id=\"test\">Test</h1>"));
         assert!(page.contains("<p>Hello world</p>"));
     }
 
@@ -1013,7 +1031,9 @@ mod tests {
     #[test]
     fn test_html_escaping_in_heading() {
         let body = render_body("# Hello <world> & \"friends\"");
-        assert!(body.contains("<h1>Hello &lt;world&gt; &amp; &quot;friends&quot;</h1>"));
+        assert!(body.contains(
+            "<h1 id=\"hello-world--friends\">Hello &lt;world&gt; &amp; &quot;friends&quot;</h1>"
+        ));
     }
 
     #[test]
@@ -1126,7 +1146,7 @@ mod tests {
     #[test]
     fn test_table_preceded_by_heading() {
         let body = render_body("# Title\n\n| A |\n|---|\n| 1 |");
-        assert!(body.contains("<h1>Title</h1>"));
+        assert!(body.contains("<h1 id=\"title\">Title</h1>"));
         assert!(body.contains("<table>"));
         assert!(body.contains("<td>1</td>"));
     }
