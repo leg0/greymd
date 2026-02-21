@@ -79,12 +79,20 @@ th, td { border: 1px solid #e1e4e8; padding: 0.5em 0.75em; vertical-align: top; 
 th { background: #f6f8fa; font-weight: 600; text-align: left; }
 "#;
 
+/// highlight.js common bundle (minified) for syntax highlighting.
+pub const HLJS_JS: &str = include_str!("assets/highlight.min.js");
+
+/// highlight.js GitHub theme CSS.
+pub const HLJS_CSS: &str = include_str!("assets/highlight-github.css");
+
 pub fn wrap_html_page(title: &str, body: &str, asset_prefix: &str) -> String {
     format!(
-        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/{}/style.css\">\n</head>\n<body>{}</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/{}/style.css\">\n<link rel=\"stylesheet\" href=\"/{}/highlight-github.css\">\n</head>\n<body>{}\n<script src=\"/{}/highlight.min.js\"></script>\n<script>hljs.highlightAll();</script>\n</body>\n</html>\n",
         escape_html(title),
         asset_prefix,
-        body
+        asset_prefix,
+        body,
+        asset_prefix
     )
 }
 
@@ -736,7 +744,7 @@ mod tests {
     #[test]
     fn test_wrap_html_page_empty_body() {
         let page = wrap_html_page("Empty", "", "testprefix");
-        assert!(page.contains("<body></body>"));
+        assert!(page.contains("<body>\n<script"));
         assert!(page.contains("<link"));
     }
 
@@ -1262,5 +1270,22 @@ mod tests {
         assert!(page.contains("<link rel=\"stylesheet\" href=\"/abc123/style.css\">"));
         assert!(!page.contains("<style>"));
         assert!(!page.contains("</style>"));
+    }
+
+    // Spec 7: Syntax highlighting
+
+    #[test]
+    fn test_wrap_html_page_includes_highlight_js() {
+        let page = wrap_html_page("Title", "<p>hi</p>", "abc123");
+        assert!(page.contains("<link rel=\"stylesheet\" href=\"/abc123/highlight-github.css\">"));
+        assert!(page.contains("<script src=\"/abc123/highlight.min.js\"></script>"));
+        assert!(page.contains("hljs.highlightAll()"));
+    }
+
+    #[test]
+    fn test_hljs_consts_not_empty() {
+        assert!(!HLJS_JS.is_empty());
+        assert!(!HLJS_CSS.is_empty());
+        assert!(HLJS_JS.contains("highlightAll"));
     }
 }

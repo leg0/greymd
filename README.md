@@ -26,7 +26,7 @@ cargo build --release
 4. ~~**HTML styling**~~ ✅ — Apply a clean, readable stylesheet to rendered Markdown pages and directory listings. CSS served from a dedicated GUID-based URI for browser caching.
 5. ~~**Markdown tables**~~ ✅ — GFM-style table support with column alignment.
 6. **Nested block elements** — Support block-level constructs inside blockquotes (fenced code blocks, lists, nested blockquotes).
-7. **Syntax highlighting** — Language-aware syntax highlighting for fenced code blocks.
+7. ~~**Syntax highlighting**~~ ✅ — Language-aware syntax highlighting for fenced code blocks using embedded highlight.js.
 
 ## Design Goals
 

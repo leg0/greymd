@@ -94,6 +94,13 @@ fn handle_connection(stream: &std::net::TcpStream, root: &Path) {
         // To add a new asset, add a match arm here with the filename and content.
         match asset_name {
             "style.css" => HttpResponse::ok("text/css", markdown::CSS.as_bytes().to_vec()),
+            "highlight.min.js" => HttpResponse::ok(
+                "application/javascript",
+                markdown::HLJS_JS.as_bytes().to_vec(),
+            ),
+            "highlight-github.css" => {
+                HttpResponse::ok("text/css", markdown::HLJS_CSS.as_bytes().to_vec())
+            }
             _ => HttpResponse::not_found(),
         }
     } else {
@@ -495,5 +502,41 @@ mod tests {
         let resp = get(port, "/hello.txt");
         assert!(resp.contains("HTTP/1.1 200 OK"));
         assert!(resp.contains("hello world"));
+    }
+
+    // Spec 7: Syntax highlighting asset tests
+
+    #[test]
+    fn asset_highlight_js_returns_200() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, &format!("/{}/highlight.min.js", ASSET_PREFIX));
+        assert!(resp.contains("HTTP/1.1 200 OK"));
+        assert!(resp.contains("Content-Type: application/javascript"));
+        assert!(resp.contains("highlightAll"));
+    }
+
+    #[test]
+    fn asset_highlight_css_returns_200() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, &format!("/{}/highlight-github.css", ASSET_PREFIX));
+        assert!(resp.contains("HTTP/1.1 200 OK"));
+        assert!(resp.contains("Content-Type: text/css"));
+    }
+
+    #[test]
+    fn markdown_page_includes_highlight_script() {
+        let dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(
+            dir.path().join("doc.md"),
+            "# Test\n\n```rust\nfn main() {}\n```",
+        )
+        .unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/doc.md");
+        assert!(resp.contains("highlight.min.js"));
+        assert!(resp.contains("highlight-github.css"));
+        assert!(resp.contains("hljs.highlightAll()"));
     }
 }

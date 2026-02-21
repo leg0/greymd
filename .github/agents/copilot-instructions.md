@@ -10,6 +10,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-20
 - N/A (purely presentational) (004-html-styling)
 - Rust 2024 edition (rustc 1.91.1) + Zero external crates (std only) (006-asset-serving)
 - N/A (assets compiled into binary as `const &str`) (006-asset-serving)
+- Rust 2024 edition (rustc 1.91.1) + Zero Rust crate deps; highlight.js embedded as static content (007-syntax-highlighting)
 
 - Rust 2024 edition (rustc 1.85+) + None (zero external crates per constitution) (001-static-file-server)
 
@@ -29,9 +30,9 @@ cargo test [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECH
 Rust 2024 edition (rustc 1.85+): Follow standard conventions
 
 ## Recent Changes
+- 007-syntax-highlighting: Added Rust 2024 edition (rustc 1.91.1) + Zero Rust crate deps; highlight.js embedded as static content
 - 006-asset-serving: Added Rust 2024 edition (rustc 1.91.1) + Zero external crates (std only)
 - 005-markdown-tables: Added Rust 2024 edition (rustc 1.91.1) + None (zero external crates)
-- 004-html-styling: Added Rust 2024 edition (rustc 1.91.1) + None (zero external crates)
 
 
 <!-- MANUAL ADDITIONS START -->
