@@ -93,13 +93,12 @@ fn handle_connection(stream: &std::net::TcpStream, root: &Path) {
         // Serve built-in assets from the GUID namespace.
         // To add a new asset, add a match arm here with the filename and content.
         match asset_name {
-            "style.css" => HttpResponse::ok("text/css", markdown::CSS.as_bytes().to_vec()),
-            "highlight.min.js" => HttpResponse::ok(
-                "application/javascript",
-                markdown::HLJS_JS.as_bytes().to_vec(),
-            ),
+            "style.css" => HttpResponse::ok_gzip("text/css", markdown::CSS_GZ.to_vec()),
+            "highlight.min.js" => {
+                HttpResponse::ok_gzip("application/javascript", markdown::HLJS_JS_GZ.to_vec())
+            }
             "highlight-github.css" => {
-                HttpResponse::ok("text/css", markdown::HLJS_CSS.as_bytes().to_vec())
+                HttpResponse::ok_gzip("text/css", markdown::HLJS_CSS_GZ.to_vec())
             }
             _ => HttpResponse::not_found(),
         }
@@ -156,6 +155,16 @@ mod tests {
         stream.shutdown(std::net::Shutdown::Write).unwrap();
         let mut response = String::new();
         stream.read_to_string(&mut response).unwrap();
+        response
+    }
+
+    fn get_bytes(port: u16, path: &str) -> Vec<u8> {
+        let mut stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        let request = format!("GET {} HTTP/1.1\r\nHost: localhost\r\n\r\n", path);
+        stream.write_all(request.as_bytes()).unwrap();
+        stream.shutdown(std::net::Shutdown::Write).unwrap();
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).unwrap();
         response
     }
 
@@ -438,8 +447,11 @@ mod tests {
         let dir = crate::path::tempdir::TempDir::new();
         std::fs::write(dir.path().join("doc.md"), "# Test").unwrap();
         let port = start_server(dir.path());
-        let resp = get(port, &format!("/{}/style.css", ASSET_PREFIX));
-        assert!(resp.contains("max-width"));
+        let resp = get_bytes(port, &format!("/{}/style.css", ASSET_PREFIX));
+        let header_end = resp.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+        let header = std::str::from_utf8(&resp[..header_end]).unwrap();
+        assert!(header.contains("Content-Encoding: gzip"));
+        assert!(header.contains("Content-Type: text/css"));
     }
 
     // Spec 6: Asset serving integration tests
@@ -448,10 +460,15 @@ mod tests {
     fn asset_css_returns_200_with_css_content_type() {
         let dir = setup_test_dir();
         let port = start_server(dir.path());
-        let resp = get(port, &format!("/{}/style.css", ASSET_PREFIX));
-        assert!(resp.contains("HTTP/1.1 200 OK"));
-        assert!(resp.contains("Content-Type: text/css"));
-        assert!(resp.contains("font-family:"));
+        let resp = get_bytes(port, &format!("/{}/style.css", ASSET_PREFIX));
+        let header_end = resp.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+        let header = std::str::from_utf8(&resp[..header_end]).unwrap();
+        assert!(header.contains("HTTP/1.1 200 OK"));
+        assert!(header.contains("Content-Type: text/css"));
+        assert!(header.contains("Content-Encoding: gzip"));
+        // Body starts with gzip magic bytes
+        assert_eq!(resp[header_end + 4], 0x1f);
+        assert_eq!(resp[header_end + 5], 0x8b);
     }
 
     #[test]
@@ -510,19 +527,24 @@ mod tests {
     fn asset_highlight_js_returns_200() {
         let dir = setup_test_dir();
         let port = start_server(dir.path());
-        let resp = get(port, &format!("/{}/highlight.min.js", ASSET_PREFIX));
-        assert!(resp.contains("HTTP/1.1 200 OK"));
-        assert!(resp.contains("Content-Type: application/javascript"));
-        assert!(resp.contains("highlightAll"));
+        let resp = get_bytes(port, &format!("/{}/highlight.min.js", ASSET_PREFIX));
+        let header_end = resp.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+        let header = std::str::from_utf8(&resp[..header_end]).unwrap();
+        assert!(header.contains("HTTP/1.1 200 OK"));
+        assert!(header.contains("Content-Type: application/javascript"));
+        assert!(header.contains("Content-Encoding: gzip"));
     }
 
     #[test]
     fn asset_highlight_css_returns_200() {
         let dir = setup_test_dir();
         let port = start_server(dir.path());
-        let resp = get(port, &format!("/{}/highlight-github.css", ASSET_PREFIX));
-        assert!(resp.contains("HTTP/1.1 200 OK"));
-        assert!(resp.contains("Content-Type: text/css"));
+        let resp = get_bytes(port, &format!("/{}/highlight-github.css", ASSET_PREFIX));
+        let header_end = resp.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+        let header = std::str::from_utf8(&resp[..header_end]).unwrap();
+        assert!(header.contains("HTTP/1.1 200 OK"));
+        assert!(header.contains("Content-Type: text/css"));
+        assert!(header.contains("Content-Encoding: gzip"));
     }
 
     #[test]

@@ -34,6 +34,7 @@ pub struct HttpResponse {
     pub status_code: u16,
     pub status_text: &'static str,
     pub content_type: &'static str,
+    pub content_encoding: Option<&'static str>,
     pub body: Vec<u8>,
 }
 
@@ -43,6 +44,17 @@ impl HttpResponse {
             status_code: 200,
             status_text: "OK",
             content_type,
+            content_encoding: None,
+            body,
+        }
+    }
+
+    pub fn ok_gzip(content_type: &'static str, body: Vec<u8>) -> Self {
+        Self {
+            status_code: 200,
+            status_text: "OK",
+            content_type,
+            content_encoding: Some("gzip"),
             body,
         }
     }
@@ -52,6 +64,7 @@ impl HttpResponse {
             status_code: 404,
             status_text: "Not Found",
             content_type: "text/html",
+            content_encoding: None,
             body: b"<h1>404 Not Found</h1>".to_vec(),
         }
     }
@@ -61,18 +74,23 @@ impl HttpResponse {
             status_code: 405,
             status_text: "Method Not Allowed",
             content_type: "text/html",
+            content_encoding: None,
             body: b"<h1>405 Method Not Allowed</h1>".to_vec(),
         }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let header = format!(
-            "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+        let mut header = format!(
+            "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n",
             self.status_code,
             self.status_text,
             self.content_type,
             self.body.len()
         );
+        if let Some(enc) = self.content_encoding {
+            header.push_str(&format!("Content-Encoding: {}\r\n", enc));
+        }
+        header.push_str("\r\n");
         let mut bytes = header.into_bytes();
         bytes.extend_from_slice(&self.body);
         bytes

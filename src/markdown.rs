@@ -19,71 +19,14 @@ pub fn escape_html(text: &str) -> String {
 }
 
 /// Wrap rendered HTML body in a complete HTML5 page.
-/// Embedded CSS stylesheet for all HTML pages.
-pub const CSS: &str = r#"
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-    font-size: 16px;
-    line-height: 1.6;
-    color: #24292e;
-    max-width: 48em;
-    margin: 0 auto;
-    padding: 1em 2em;
-}
-h1, h2, h3, h4, h5, h6 { margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
-h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-h3 { font-size: 1.25em; }
-h4 { font-size: 1em; }
-h5 { font-size: 0.875em; }
-h6 { font-size: 0.85em; color: #6a737d; }
-p { margin: 0.5em 0 1em; }
-a { color: #0366d6; text-decoration: none; }
-a:hover { text-decoration: underline; }
-code {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.9em;
-    background: #f0f0f0;
-    padding: 0.2em 0.4em;
-    border-radius: 3px;
-}
-pre {
-    background: #f6f8fa;
-    border: 1px solid #e1e4e8;
-    border-radius: 6px;
-    padding: 1em;
-    overflow-x: auto;
-    line-height: 1.45;
-}
-pre code {
-    background: none;
-    padding: 0;
-    font-size: 0.9em;
-}
-blockquote {
-    border-left: 4px solid #dfe2e5;
-    padding: 0.5em 1em;
-    margin: 1em 0;
-    color: #6a737d;
-}
-ul, ol { padding-left: 2em; }
-li { padding: 0.25em 0; }
-hr {
-    border: none;
-    border-top: 1px solid #e1e4e8;
-    margin: 1.5em 0;
-}
-img { max-width: 100%; }
-table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-th, td { border: 1px solid #e1e4e8; padding: 0.5em 0.75em; vertical-align: top; }
-th { background: #f6f8fa; font-weight: 600; text-align: left; }
-"#;
+/// Embedded CSS stylesheet for all HTML pages (gzipped).
+pub const CSS_GZ: &[u8] = include_bytes!("assets/style.css.gz");
 
-/// highlight.js common bundle (minified) for syntax highlighting.
-pub const HLJS_JS: &str = include_str!("assets/highlight.min.js");
+/// highlight.js common bundle, gzipped.
+pub const HLJS_JS_GZ: &[u8] = include_bytes!("assets/highlight.min.js.gz");
 
-/// highlight.js GitHub theme CSS.
-pub const HLJS_CSS: &str = include_str!("assets/highlight-github.css");
+/// highlight.js GitHub theme CSS, gzipped.
+pub const HLJS_CSS_GZ: &[u8] = include_bytes!("assets/highlight-github.css.gz");
 
 pub fn wrap_html_page(title: &str, body: &str, asset_prefix: &str) -> String {
     format!(
@@ -771,30 +714,32 @@ mod tests {
 
     #[test]
     fn test_css_contains_typography_rules() {
-        assert!(CSS.contains("font-family:"));
-        assert!(CSS.contains("max-width:"));
-        assert!(CSS.contains("line-height:"));
+        let css = include_str!("assets/style.css");
+        assert!(css.contains("font-family:"));
+        assert!(css.contains("max-width:"));
+        assert!(css.contains("line-height:"));
     }
 
     #[test]
     fn test_css_contains_element_rules() {
+        let css = include_str!("assets/style.css");
         // Headings
-        assert!(CSS.contains("h1"));
-        assert!(CSS.contains("h6"));
+        assert!(css.contains("h1"));
+        assert!(css.contains("h6"));
         // Code
-        assert!(CSS.contains("pre {"));
-        assert!(CSS.contains("code {"));
-        assert!(CSS.contains("overflow-x: auto"));
+        assert!(css.contains("pre {"));
+        assert!(css.contains("code {"));
+        assert!(css.contains("overflow-x: auto"));
         // Links
-        assert!(CSS.contains("a {"));
-        assert!(CSS.contains("#0366d6"));
+        assert!(css.contains("a {"));
+        assert!(css.contains("#0366d6"));
         // Blockquotes
-        assert!(CSS.contains("blockquote"));
-        assert!(CSS.contains("#dfe2e5"));
+        assert!(css.contains("blockquote"));
+        assert!(css.contains("#dfe2e5"));
         // HR
-        assert!(CSS.contains("hr {"));
+        assert!(css.contains("hr {"));
         // Images
-        assert!(CSS.contains("img {"));
+        assert!(css.contains("img {"));
     }
 
     #[test]
@@ -1211,10 +1156,11 @@ mod tests {
 
     #[test]
     fn test_css_contains_table_rules() {
-        assert!(CSS.contains("table {"));
-        assert!(CSS.contains("border-collapse: collapse"));
-        assert!(CSS.contains("th, td {"));
-        assert!(CSS.contains("border: 1px solid"));
+        let css = include_str!("assets/style.css");
+        assert!(css.contains("table {"));
+        assert!(css.contains("border-collapse: collapse"));
+        assert!(css.contains("th, td {"));
+        assert!(css.contains("border: 1px solid"));
     }
 
     // Phase 6: Edge Cases
@@ -1284,8 +1230,10 @@ mod tests {
 
     #[test]
     fn test_hljs_consts_not_empty() {
-        assert!(!HLJS_JS.is_empty());
-        assert!(!HLJS_CSS.is_empty());
-        assert!(HLJS_JS.contains("highlightAll"));
+        assert!(!HLJS_JS_GZ.is_empty());
+        assert!(!HLJS_CSS_GZ.is_empty());
+        // Gzipped data starts with magic bytes 0x1f 0x8b
+        assert_eq!(HLJS_JS_GZ[0], 0x1f);
+        assert_eq!(HLJS_JS_GZ[1], 0x8b);
     }
 }
