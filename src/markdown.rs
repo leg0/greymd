@@ -27,7 +27,7 @@ pub const HLJS_JS_GZ: &[u8] = include_bytes!("assets/highlight.min.js.gz");
 
 pub fn wrap_html_page(title: &str, body: &str) -> String {
     format!(
-        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/?css\">\n</head>\n<body>{}\n<script src=\"/?js\"></script>\n<script>hljs.highlightAll();</script>\n</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/?css\">\n</head>\n<body>{}\n<script src=\"/?js\"></script>\n<script>hljs.highlightAll();document.querySelectorAll('pre').forEach(function(p){{var b=document.createElement('button');b.className='copy-btn';b.textContent='\u{1F4CB}';b.onclick=function(){{navigator.clipboard.writeText(p.querySelector('code').textContent).then(function(){{b.textContent='\u{2713}';setTimeout(function(){{b.textContent='\u{1F4CB}'}},1500)}});}};p.appendChild(b)}})</script>\n</body>\n</html>\n",
         escape_html(title),
         body,
     )
