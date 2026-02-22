@@ -4,8 +4,13 @@ use std::path::Path;
 
 use crate::http::{HttpRequest, HttpResponse};
 use crate::listing;
+use crate::markdown;
 use crate::mime::content_type_for;
 use crate::path::{ResolvedPath, resolve_path};
+
+/// Asset namespace prefix — a compile-time GUID that reserves a URL path
+/// for serving built-in assets (CSS, JS). Intercepted before filesystem resolution.
+pub const ASSET_PREFIX: &str = "d4f7a2b1e8c3905d6a1b4e7f2c8d3a0e";
 
 pub fn start(root: &Path, port: u16) {
     let addr = format!("127.0.0.1:{}", port);
@@ -39,7 +44,7 @@ fn serve_file(file_path: &Path) -> HttpResponse {
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("untitled.md");
-                let html = crate::markdown::render(&source, filename);
+                let html = crate::markdown::render(&source, filename, ASSET_PREFIX);
                 HttpResponse::ok("text/html", html.into_bytes())
             }
             Err(_) => HttpResponse::not_found(),
@@ -71,7 +76,7 @@ fn serve_directory(dir_path: &Path, root: &Path, url_path: &str) -> HttpResponse
     // Fall back to listing
     let root_canonical = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let show_parent = dir_path != root_canonical;
-    let html = listing::render_listing(url_path, &entries, show_parent);
+    let html = listing::render_listing(url_path, &entries, show_parent, ASSET_PREFIX);
     HttpResponse::ok("text/html", html.into_bytes())
 }
 
@@ -84,6 +89,13 @@ fn handle_connection(stream: &std::net::TcpStream, root: &Path) {
 
     let response = if request.method != "GET" {
         HttpResponse::method_not_allowed()
+    } else if let Some(asset_name) = request.path.strip_prefix(&format!("/{}/", ASSET_PREFIX)) {
+        // Serve built-in assets from the GUID namespace.
+        // To add a new asset, add a match arm here with the filename and content.
+        match asset_name {
+            "style.css" => HttpResponse::ok("text/css", markdown::CSS.as_bytes().to_vec()),
+            _ => HttpResponse::not_found(),
+        }
     } else {
         match resolve_path(root, &request.path) {
             Some(ResolvedPath::File(file_path)) => serve_file(&file_path),
@@ -376,30 +388,30 @@ mod tests {
     // Spec 4: HTML Styling integration tests
 
     #[test]
-    fn markdown_page_has_style_block() {
+    fn markdown_page_has_link_tag() {
         let dir = crate::path::tempdir::TempDir::new();
         std::fs::write(dir.path().join("doc.md"), "# Test").unwrap();
         let port = start_server(dir.path());
         let resp = get(port, "/doc.md");
-        assert!(resp.contains("<style>"));
-        assert!(resp.contains("</style>"));
+        assert!(resp.contains("<link"));
+        assert!(resp.contains("style.css"));
         assert!(resp.contains("name=\"viewport\""));
     }
 
     #[test]
-    fn directory_listing_has_style_block() {
+    fn directory_listing_has_link_tag() {
         let dir = crate::path::tempdir::TempDir::new();
         std::fs::write(dir.path().join("a.md"), "# A").unwrap();
         std::fs::write(dir.path().join("b.md"), "# B").unwrap();
         let port = start_server(dir.path());
         let resp = get(port, "/");
-        assert!(resp.contains("<style>"));
-        assert!(resp.contains("</style>"));
+        assert!(resp.contains("<link"));
+        assert!(resp.contains("style.css"));
         assert!(resp.contains("name=\"viewport\""));
     }
 
     #[test]
-    fn markdown_and_listing_share_same_style() {
+    fn markdown_and_listing_share_same_css_link() {
         let dir = crate::path::tempdir::TempDir::new();
         std::fs::write(dir.path().join("a.md"), "# A").unwrap();
         std::fs::write(dir.path().join("b.md"), "# B").unwrap();
@@ -408,17 +420,10 @@ mod tests {
         let md_resp = get(port, "/a.md");
         let listing_resp = get(port, "/");
 
-        // Extract <style>...</style> from both
-        let md_style = md_resp
-            .split("<style>")
-            .nth(1)
-            .and_then(|s| s.split("</style>").next());
-        let listing_style = listing_resp
-            .split("<style>")
-            .nth(1)
-            .and_then(|s| s.split("</style>").next());
-        assert!(md_style.is_some());
-        assert_eq!(md_style, listing_style);
+        // Both should reference the same asset prefix
+        let expected_href = format!("/{}/style.css", ASSET_PREFIX);
+        assert!(md_resp.contains(&expected_href));
+        assert!(listing_resp.contains(&expected_href));
     }
 
     #[test]
@@ -426,7 +431,69 @@ mod tests {
         let dir = crate::path::tempdir::TempDir::new();
         std::fs::write(dir.path().join("doc.md"), "# Test").unwrap();
         let port = start_server(dir.path());
-        let resp = get(port, "/doc.md");
+        let resp = get(port, &format!("/{}/style.css", ASSET_PREFIX));
         assert!(resp.contains("max-width"));
+    }
+
+    // Spec 6: Asset serving integration tests
+
+    #[test]
+    fn asset_css_returns_200_with_css_content_type() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, &format!("/{}/style.css", ASSET_PREFIX));
+        assert!(resp.contains("HTTP/1.1 200 OK"));
+        assert!(resp.contains("Content-Type: text/css"));
+        assert!(resp.contains("font-family:"));
+    }
+
+    #[test]
+    fn markdown_page_uses_link_tag_not_style() {
+        let dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(dir.path().join("doc.md"), "# Test").unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/doc.md");
+        assert!(resp.contains(&format!("/{}/style.css", ASSET_PREFIX)));
+        assert!(resp.contains("<link"));
+        assert!(!resp.contains("<style>"));
+    }
+
+    #[test]
+    fn directory_listing_uses_link_tag_not_style() {
+        let dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(dir.path().join("a.md"), "# A").unwrap();
+        std::fs::write(dir.path().join("b.md"), "# B").unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/");
+        assert!(resp.contains(&format!("/{}/style.css", ASSET_PREFIX)));
+        assert!(resp.contains("<link"));
+        assert!(!resp.contains("<style>"));
+    }
+
+    // Spec 6 US2: GUID path isolation
+
+    #[test]
+    fn asset_unknown_file_returns_404() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, &format!("/{}/unknown.file", ASSET_PREFIX));
+        assert!(resp.contains("HTTP/1.1 404 Not Found"));
+    }
+
+    #[test]
+    fn asset_prefix_no_filename_returns_404() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, &format!("/{}/", ASSET_PREFIX));
+        assert!(resp.contains("HTTP/1.1 404 Not Found"));
+    }
+
+    #[test]
+    fn normal_files_still_resolve_with_asset_prefix_active() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, "/hello.txt");
+        assert!(resp.contains("HTTP/1.1 200 OK"));
+        assert!(resp.contains("hello world"));
     }
 }

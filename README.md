@@ -23,8 +23,10 @@ cargo build --release
 1. ~~**Static file server**~~ ✅ — Serve raw files from a directory over HTTP on localhost. CLI takes a directory path argument.
 2. ~~**Markdown-to-HTML rendering**~~ ✅ — When a `.md` file is requested, convert it to HTML on the fly and serve a complete HTML page.
 3. ~~**Directory listing**~~ ✅ — When a directory is requested, return an HTML page listing its contents with navigable links.
-4. ~~**HTML styling**~~ ✅ — Apply a clean, readable stylesheet to rendered Markdown pages and directory listings.
+4. ~~**HTML styling**~~ ✅ — Apply a clean, readable stylesheet to rendered Markdown pages and directory listings. CSS served from a dedicated GUID-based URI for browser caching.
 5. ~~**Markdown tables**~~ ✅ — GFM-style table support with column alignment.
+6. **Nested block elements** — Support block-level constructs inside blockquotes (fenced code blocks, lists, nested blockquotes).
+7. **Syntax highlighting** — Language-aware syntax highlighting for fenced code blocks.
 
 ## Design Goals
 

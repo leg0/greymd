@@ -52,7 +52,12 @@ pub fn collect_entries(dir: &Path) -> Vec<DirectoryEntry> {
 }
 
 /// Render a directory listing as an HTML page.
-pub fn render_listing(url_path: &str, entries: &[DirectoryEntry], show_parent: bool) -> String {
+pub fn render_listing(
+    url_path: &str,
+    entries: &[DirectoryEntry],
+    show_parent: bool,
+    asset_prefix: &str,
+) -> String {
     let mut body = String::new();
 
     let title = if url_path == "/" {
@@ -86,7 +91,7 @@ pub fn render_listing(url_path: &str, entries: &[DirectoryEntry], show_parent: b
     }
 
     body.push('\n');
-    wrap_html_page(&title, &body)
+    wrap_html_page(&title, &body, asset_prefix)
 }
 
 fn parent_url(url_path: &str) -> String {
@@ -148,7 +153,7 @@ mod tests {
                 is_dir: false,
             },
         ];
-        let html = render_listing("/", &entries, false);
+        let html = render_listing("/", &entries, false, "testprefix");
         assert!(html.contains("<h1>Index of /</h1>"));
         assert!(html.contains("<a href=\"/docs/\">📁 docs/</a>"));
         assert!(html.contains("<a href=\"/readme.md\">📄 readme.md</a>"));
@@ -158,14 +163,14 @@ mod tests {
     #[test]
     fn render_listing_with_parent() {
         let entries = vec![];
-        let html = render_listing("/sub/dir/", &entries, true);
+        let html = render_listing("/sub/dir/", &entries, true, "testprefix");
         assert!(html.contains("<a href=\"/sub/\">📁 ..</a>"));
     }
 
     #[test]
     fn render_listing_no_parent_at_root() {
         let entries = vec![];
-        let html = render_listing("/", &entries, false);
+        let html = render_listing("/", &entries, false, "testprefix");
         assert!(!html.contains(".."));
     }
 
@@ -175,10 +180,9 @@ mod tests {
             name: "a<b>.md".into(),
             is_dir: false,
         }];
-        let html = render_listing("/", &entries, false);
+        let html = render_listing("/", &entries, false, "testprefix");
         assert!(html.contains("a&lt;b&gt;.md"));
     }
-
     #[test]
     fn parent_url_from_subdir() {
         assert_eq!(parent_url("/sub/dir/"), "/sub/");

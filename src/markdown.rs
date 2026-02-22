@@ -20,7 +20,7 @@ pub fn escape_html(text: &str) -> String {
 
 /// Wrap rendered HTML body in a complete HTML5 page.
 /// Embedded CSS stylesheet for all HTML pages.
-const CSS: &str = r#"
+pub const CSS: &str = r#"
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
     font-size: 16px;
@@ -79,11 +79,11 @@ th, td { border: 1px solid #e1e4e8; padding: 0.5em 0.75em; vertical-align: top; 
 th { background: #f6f8fa; font-weight: 600; text-align: left; }
 "#;
 
-pub fn wrap_html_page(title: &str, body: &str) -> String {
+pub fn wrap_html_page(title: &str, body: &str, asset_prefix: &str) -> String {
     format!(
-        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{}</style>\n</head>\n<body>{}</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/{}/style.css\">\n</head>\n<body>{}</body>\n</html>\n",
         escape_html(title),
-        CSS,
+        asset_prefix,
         body
     )
 }
@@ -352,10 +352,10 @@ fn alignment_style(align: Alignment) -> String {
 }
 
 /// Render Markdown source to a complete HTML5 page.
-pub fn render(source: &str, filename: &str) -> String {
+pub fn render(source: &str, filename: &str, asset_prefix: &str) -> String {
     let title = extract_title(source, filename);
     let body = render_body(source);
-    wrap_html_page(&title, &body)
+    wrap_html_page(&title, &body, asset_prefix)
 }
 
 fn render_body(source: &str) -> String {
@@ -718,15 +718,14 @@ mod tests {
 
     #[test]
     fn test_wrap_html_page() {
-        let page = wrap_html_page("My Title", "<p>hello</p>");
+        let page = wrap_html_page("My Title", "<p>hello</p>", "testprefix");
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>My Title</title>"));
         assert!(page.contains("<p>hello</p>"));
         assert!(page.contains("<meta charset=\"utf-8\">"));
         assert!(page.contains("</html>"));
-        // Styling additions
-        assert!(page.contains("<style>"));
-        assert!(page.contains("</style>"));
+        // Asset link
+        assert!(page.contains("<link rel=\"stylesheet\" href=\"/testprefix/style.css\">"));
         assert!(
             page.contains(
                 "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -736,60 +735,58 @@ mod tests {
 
     #[test]
     fn test_wrap_html_page_empty_body() {
-        let page = wrap_html_page("Empty", "");
+        let page = wrap_html_page("Empty", "", "testprefix");
         assert!(page.contains("<body></body>"));
-        assert!(page.contains("<style>"));
+        assert!(page.contains("<link"));
     }
 
     #[test]
-    fn test_wrap_html_page_contains_style_block() {
-        let page = wrap_html_page("Test", "<p>hi</p>");
-        assert!(page.contains("<style>"));
-        assert!(page.contains("</style>"));
+    fn test_wrap_html_page_contains_link_tag() {
+        let page = wrap_html_page("Test", "<p>hi</p>", "testprefix");
+        assert!(page.contains("<link"));
+        assert!(page.contains("style.css"));
     }
 
     #[test]
     fn test_wrap_html_page_contains_viewport_meta() {
-        let page = wrap_html_page("Test", "");
-        assert!(page.contains("name=\"viewport\""));
+        let page = wrap_html_page("Test", "", "testprefix");
         assert!(page.contains("width=device-width"));
     }
 
     #[test]
-    fn test_wrap_html_page_no_external_css() {
-        let page = wrap_html_page("Test", "");
-        assert!(!page.contains("<link"));
+    fn test_wrap_html_page_uses_link_not_inline() {
+        let page = wrap_html_page("Test", "", "testprefix");
+        assert!(page.contains("<link"));
+        assert!(!page.contains("<style>"));
         assert!(!page.contains("@import"));
     }
 
     #[test]
     fn test_css_contains_typography_rules() {
-        let page = wrap_html_page("Test", "");
-        assert!(page.contains("font-family:"));
-        assert!(page.contains("max-width:"));
-        assert!(page.contains("line-height:"));
+        assert!(CSS.contains("font-family:"));
+        assert!(CSS.contains("max-width:"));
+        assert!(CSS.contains("line-height:"));
     }
 
     #[test]
     fn test_css_contains_element_rules() {
-        let page = wrap_html_page("Test", "");
         // Headings
-        assert!(page.contains("h1"));
-        assert!(page.contains("h6"));
+        assert!(CSS.contains("h1"));
+        assert!(CSS.contains("h6"));
         // Code
-        assert!(page.contains("pre {"));
-        assert!(page.contains("code {"));
-        assert!(page.contains("overflow-x: auto"));
+        assert!(CSS.contains("pre {"));
+        assert!(CSS.contains("code {"));
+        assert!(CSS.contains("overflow-x: auto"));
         // Links
-        assert!(page.contains("a {"));
-        assert!(page.contains("#0366d6"));
+        assert!(CSS.contains("a {"));
+        assert!(CSS.contains("#0366d6"));
         // Blockquotes
-        assert!(page.contains("blockquote"));
-        assert!(page.contains("#dfe2e5"));
+        assert!(CSS.contains("blockquote"));
+        assert!(CSS.contains("#dfe2e5"));
         // HR
-        assert!(page.contains("hr {"));
+        assert!(CSS.contains("hr {"));
         // Images
-        assert!(page.contains("img {"));
+        assert!(CSS.contains("img {"));
     }
 
     #[test]
@@ -835,6 +832,7 @@ mod tests {
         let page = render(
             "# rd::expected<void, E>\n\nSome text with <html> & \"quotes\"",
             "test.md",
+            "testprefix",
         );
         // Title should be escaped once
         assert!(
@@ -955,7 +953,7 @@ mod tests {
 
     #[test]
     fn test_render_produces_html_page() {
-        let page = render("# Test\n\nHello world", "test.md");
+        let page = render("# Test\n\nHello world", "test.md", "testprefix");
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>Test</title>"));
         assert!(page.contains("<h1>Test</h1>"));
@@ -1047,7 +1045,7 @@ mod tests {
 
     #[test]
     fn test_empty_markdown() {
-        let page = render("", "empty.md");
+        let page = render("", "empty.md", "testprefix");
         assert!(page.contains("<title>empty</title>"));
         assert!(page.contains("<body>"));
     }
@@ -1205,11 +1203,10 @@ mod tests {
 
     #[test]
     fn test_css_contains_table_rules() {
-        let page = wrap_html_page("Test", "");
-        assert!(page.contains("table {"));
-        assert!(page.contains("border-collapse: collapse"));
-        assert!(page.contains("th, td {"));
-        assert!(page.contains("border: 1px solid"));
+        assert!(CSS.contains("table {"));
+        assert!(CSS.contains("border-collapse: collapse"));
+        assert!(CSS.contains("th, td {"));
+        assert!(CSS.contains("border: 1px solid"));
     }
 
     // Phase 6: Edge Cases
@@ -1255,5 +1252,15 @@ mod tests {
         assert!(body.contains("<table>"));
         assert!(body.contains("<th>A</th>"));
         assert!(body.contains("<td>2</td>"));
+    }
+
+    // Spec 6: Asset serving — wrap_html_page with asset prefix
+
+    #[test]
+    fn test_wrap_html_page_with_asset_prefix() {
+        let page = wrap_html_page("Title", "<p>hi</p>", "abc123");
+        assert!(page.contains("<link rel=\"stylesheet\" href=\"/abc123/style.css\">"));
+        assert!(!page.contains("<style>"));
+        assert!(!page.contains("</style>"));
     }
 }
