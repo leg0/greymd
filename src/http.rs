@@ -4,6 +4,7 @@ use std::net::TcpStream;
 pub struct HttpRequest {
     pub method: String,
     pub path: String,
+    pub query: Option<String>,
 }
 
 impl HttpRequest {
@@ -12,7 +13,11 @@ impl HttpRequest {
         stream.read_line(&mut request_line).ok()?;
         let mut parts = request_line.trim().splitn(3, ' ');
         let method = parts.next()?.to_string();
-        let path = parts.next()?.to_string();
+        let raw_path = parts.next()?.to_string();
+        let (path, query) = match raw_path.split_once('?') {
+            Some((p, q)) => (p.to_string(), Some(q.to_string())),
+            None => (raw_path, None),
+        };
         // Consume remaining headers (read until empty line)
         loop {
             let mut line = String::new();
@@ -26,7 +31,11 @@ impl HttpRequest {
                 Err(_) => break,
             }
         }
-        Some(HttpRequest { method, path })
+        Some(HttpRequest {
+            method,
+            path,
+            query,
+        })
     }
 }
 

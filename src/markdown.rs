@@ -19,23 +19,17 @@ pub fn escape_html(text: &str) -> String {
 }
 
 /// Wrap rendered HTML body in a complete HTML5 page.
-/// Embedded CSS stylesheet for all HTML pages (gzipped).
-pub const CSS_GZ: &[u8] = include_bytes!("assets/style.css.gz");
+/// Embedded CSS stylesheet (main + highlight theme), gzipped.
+pub const CSS_GZ: &[u8] = include_bytes!("assets/combined.css.gz");
 
 /// highlight.js common bundle, gzipped.
 pub const HLJS_JS_GZ: &[u8] = include_bytes!("assets/highlight.min.js.gz");
 
-/// highlight.js GitHub theme CSS, gzipped.
-pub const HLJS_CSS_GZ: &[u8] = include_bytes!("assets/highlight-github.css.gz");
-
-pub fn wrap_html_page(title: &str, body: &str, asset_prefix: &str) -> String {
+pub fn wrap_html_page(title: &str, body: &str) -> String {
     format!(
-        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/{}/style.css\">\n<link rel=\"stylesheet\" href=\"/{}/highlight-github.css\">\n</head>\n<body>{}\n<script src=\"/{}/highlight.min.js\"></script>\n<script>hljs.highlightAll();</script>\n</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/?css\">\n</head>\n<body>{}\n<script src=\"/?js\"></script>\n<script>hljs.highlightAll();</script>\n</body>\n</html>\n",
         escape_html(title),
-        asset_prefix,
-        asset_prefix,
         body,
-        asset_prefix
     )
 }
 
@@ -303,10 +297,10 @@ fn alignment_style(align: Alignment) -> String {
 }
 
 /// Render Markdown source to a complete HTML5 page.
-pub fn render(source: &str, filename: &str, asset_prefix: &str) -> String {
+pub fn render(source: &str, filename: &str) -> String {
     let title = extract_title(source, filename);
     let body = render_body(source);
-    wrap_html_page(&title, &body, asset_prefix)
+    wrap_html_page(&title, &body)
 }
 
 fn render_body(source: &str) -> String {
@@ -687,14 +681,14 @@ mod tests {
 
     #[test]
     fn test_wrap_html_page() {
-        let page = wrap_html_page("My Title", "<p>hello</p>", "testprefix");
+        let page = wrap_html_page("My Title", "<p>hello</p>");
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>My Title</title>"));
         assert!(page.contains("<p>hello</p>"));
         assert!(page.contains("<meta charset=\"utf-8\">"));
         assert!(page.contains("</html>"));
         // Asset link
-        assert!(page.contains("<link rel=\"stylesheet\" href=\"/testprefix/style.css\">"));
+        assert!(page.contains("<link rel=\"stylesheet\" href=\"/?css\">"));
         assert!(
             page.contains(
                 "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -704,27 +698,27 @@ mod tests {
 
     #[test]
     fn test_wrap_html_page_empty_body() {
-        let page = wrap_html_page("Empty", "", "testprefix");
+        let page = wrap_html_page("Empty", "");
         assert!(page.contains("<body>\n<script"));
         assert!(page.contains("<link"));
     }
 
     #[test]
     fn test_wrap_html_page_contains_link_tag() {
-        let page = wrap_html_page("Test", "<p>hi</p>", "testprefix");
+        let page = wrap_html_page("Test", "<p>hi</p>");
         assert!(page.contains("<link"));
-        assert!(page.contains("style.css"));
+        assert!(page.contains("/?css"));
     }
 
     #[test]
     fn test_wrap_html_page_contains_viewport_meta() {
-        let page = wrap_html_page("Test", "", "testprefix");
+        let page = wrap_html_page("Test", "");
         assert!(page.contains("width=device-width"));
     }
 
     #[test]
     fn test_wrap_html_page_uses_link_not_inline() {
-        let page = wrap_html_page("Test", "", "testprefix");
+        let page = wrap_html_page("Test", "");
         assert!(page.contains("<link"));
         assert!(!page.contains("<style>"));
         assert!(!page.contains("@import"));
@@ -803,7 +797,6 @@ mod tests {
         let page = render(
             "# rd::expected<void, E>\n\nSome text with <html> & \"quotes\"",
             "test.md",
-            "testprefix",
         );
         // Title should be escaped once
         assert!(
@@ -924,7 +917,7 @@ mod tests {
 
     #[test]
     fn test_render_produces_html_page() {
-        let page = render("# Test\n\nHello world", "test.md", "testprefix");
+        let page = render("# Test\n\nHello world", "test.md");
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>Test</title>"));
         assert!(page.contains("<h1 id=\"test\">Test</h1>"));
@@ -1016,7 +1009,7 @@ mod tests {
 
     #[test]
     fn test_empty_markdown() {
-        let page = render("", "empty.md", "testprefix");
+        let page = render("", "empty.md");
         assert!(page.contains("<title>empty</title>"));
         assert!(page.contains("<body>"));
     }
@@ -1228,31 +1221,31 @@ mod tests {
         assert!(body.contains("<td>2</td>"));
     }
 
-    // Spec 6: Asset serving — wrap_html_page with asset prefix
+    // Spec 6: Asset serving — wrap_html_page with query-string assets
 
     #[test]
-    fn test_wrap_html_page_with_asset_prefix() {
-        let page = wrap_html_page("Title", "<p>hi</p>", "abc123");
-        assert!(page.contains("<link rel=\"stylesheet\" href=\"/abc123/style.css\">"));
+    fn test_wrap_html_page_uses_query_string_assets() {
+        let page = wrap_html_page("Title", "<p>hi</p>");
+        assert!(page.contains("<link rel=\"stylesheet\" href=\"/?css\">"));
         assert!(!page.contains("<style>"));
-        assert!(!page.contains("</style>"));
     }
 
     // Spec 7: Syntax highlighting
 
     #[test]
     fn test_wrap_html_page_includes_highlight_js() {
-        let page = wrap_html_page("Title", "<p>hi</p>", "abc123");
-        assert!(page.contains("<link rel=\"stylesheet\" href=\"/abc123/highlight-github.css\">"));
-        assert!(page.contains("<script src=\"/abc123/highlight.min.js\"></script>"));
+        let page = wrap_html_page("Title", "<p>hi</p>");
+        assert!(page.contains("<script src=\"/?js\"></script>"));
         assert!(page.contains("hljs.highlightAll()"));
     }
 
     #[test]
-    fn test_hljs_consts_not_empty() {
+    fn test_asset_consts_not_empty() {
+        assert!(!CSS_GZ.is_empty());
         assert!(!HLJS_JS_GZ.is_empty());
-        assert!(!HLJS_CSS_GZ.is_empty());
         // Gzipped data starts with magic bytes 0x1f 0x8b
+        assert_eq!(CSS_GZ[0], 0x1f);
+        assert_eq!(CSS_GZ[1], 0x8b);
         assert_eq!(HLJS_JS_GZ[0], 0x1f);
         assert_eq!(HLJS_JS_GZ[1], 0x8b);
     }
