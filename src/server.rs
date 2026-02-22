@@ -77,6 +77,7 @@ fn serve_directory(dir_path: &Path, root: &Path, url_path: &str) -> HttpResponse
 }
 
 fn handle_connection(stream: &std::net::TcpStream, root: &Path) {
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(1)));
     let mut reader = std::io::BufReader::new(stream);
     let request = match HttpRequest::parse(&mut reader) {
         Some(r) => r,
