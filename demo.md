@@ -1,6 +1,6 @@
-# docsvr Feature Demo
+# greymd Feature Demo
 
-This page showcases every Markdown feature supported by **docsvr**.
+This page showcases every Markdown feature supported by **greymd**.
 
 ---
 
@@ -124,7 +124,7 @@ The lines above and below are horizontal rules (`---`).
 
 ## Putting It All Together
 
-> **Tip:** Run docsvr with `docsvr /path/to/your/markdown/files`
+> **Tip:** Run greymd with `greymd /path/to/your/markdown/files`
 > and then open `http://localhost:8080` in your browser.
 
 1. All rendering happens **on the fly** — no build step needed

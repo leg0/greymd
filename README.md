@@ -1,4 +1,4 @@
-# docsvr
+# greymd
 
 A local HTTP server that serves Markdown files as HTML.
 
@@ -7,7 +7,7 @@ Point it at a directory of `.md` files and browse them in your web browser — M
 ## Usage
 
 ```sh
-docsvr [directory]
+greymd [directory]
 ```
 
 Opens an HTTP server on `localhost` serving the contents of `directory` (defaults to the current directory). Navigate to any `.md` file path in your browser to see it rendered as HTML.

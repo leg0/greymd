@@ -150,7 +150,7 @@ pub(crate) mod tempdir {
     impl TempDir {
         pub fn new() -> Self {
             let mut path = std::env::temp_dir();
-            path.push(format!("docsvr-test-{}", std::process::id()));
+            path.push(format!("greymd-test-{}", std::process::id()));
             // Add a counter to avoid collisions between tests
             static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
             let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

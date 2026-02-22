@@ -36,7 +36,7 @@ fn main() {
 }
 
 fn print_usage() {
-    println!("Usage: docsvr [directory]");
+    println!("Usage: greymd [directory]");
     println!();
     println!("Serve files from a directory over HTTP on localhost.");
     println!();
