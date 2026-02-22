@@ -4,6 +4,18 @@ A local HTTP server that serves Markdown files as HTML.
 
 Point it at a directory of `.md` files and browse them in your web browser — Markdown is converted to HTML on the fly.
 
+## Why greymd?
+
+Most markdown previewers pull in hundreds of npm packages, require Node.js or Python runtimes, or phone home to cloud services. greymd is different:
+
+- **Single binary, zero runtime dependencies.** Download one file, run it. No Node, no Python, no package manager. Built entirely on the Rust standard library — nothing to install, nothing to update, nothing to break.
+- **Instant startup.** Launches in milliseconds. No bundling step, no dev server warmup, no "compiling dependencies" progress bar.
+- **Tiny footprint.** The entire binary — including the HTTP server, markdown parser, syntax highlighter, and stylesheets — fits in a few hundred kilobytes. It uses almost no memory at runtime.
+- **Works offline.** Everything is embedded in the binary. No CDN requests, no font downloads, no analytics scripts. Open your laptop on a plane and it just works.
+- **Serves a directory, not a file.** Point it at a folder of `.md` files and browse them like a wiki — with directory listings, clickable navigation, and automatic index pages.
+
+If you want a simple, fast, self-contained way to read markdown in a browser, greymd is all you need.
+
 ## Usage
 
 ```sh
@@ -18,18 +30,9 @@ Opens an HTTP server on `localhost` serving the contents of `directory` (default
 cargo build --release
 ```
 
-## Roadmap
-
-1. ~~**Static file server**~~ ✅ — Serve raw files from a directory over HTTP on localhost. CLI takes a directory path argument.
-2. ~~**Markdown-to-HTML rendering**~~ ✅ — When a `.md` file is requested, convert it to HTML on the fly and serve a complete HTML page.
-3. ~~**Directory listing**~~ ✅ — When a directory is requested, return an HTML page listing its contents with navigable links.
-4. ~~**HTML styling**~~ ✅ — Apply a clean, readable stylesheet to rendered Markdown pages and directory listings. CSS served from a dedicated GUID-based URI for browser caching.
-5. ~~**Markdown tables**~~ ✅ — GFM-style table support with column alignment.
-6. **Nested block elements** — Support block-level constructs inside blockquotes (fenced code blocks, lists, nested blockquotes).
-7. ~~**Syntax highlighting**~~ ✅ — Language-aware syntax highlighting for fenced code blocks using embedded highlight.js.
-
 ## Design Goals
 
+- **Reasonable portion of MD support** — most useful bits of markdown supported
 - **Zero dependencies** — built entirely on the Rust standard library
 - **Minimal resource usage** — low memory footprint, fast response times
 - **Local only** — serves on localhost over plain HTTP, no TLS
