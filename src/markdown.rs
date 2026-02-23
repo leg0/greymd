@@ -20,10 +20,10 @@ pub fn escape_html(text: &str) -> String {
 
 /// Wrap rendered HTML body in a complete HTML5 page.
 /// Embedded CSS stylesheet (main + highlight theme), gzipped.
-pub const CSS_GZ: &[u8] = include_bytes!("assets/combined.css.gz");
+pub const CSS_GZ: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/combined.css.gz"));
 
 /// highlight.js common bundle, gzipped.
-pub const HLJS_JS_GZ: &[u8] = include_bytes!("assets/highlight.min.js.gz");
+pub const HLJS_JS_GZ: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/highlight.min.js.gz"));
 
 pub fn wrap_html_page(title: &str, body: &str) -> String {
     format!(

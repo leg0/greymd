@@ -4,3 +4,6 @@ version = "1.2.0"
 edition = "2024"
 
 [dependencies]
+
+[build-dependencies]
+miniz_oxide = "0.8"
