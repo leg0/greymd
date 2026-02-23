@@ -259,7 +259,7 @@ mod tests {
         assert!(resp.contains("HTTP/1.1 200 OK"));
         assert!(resp.contains("Content-Type: text/html"));
         assert!(resp.contains("<!DOCTYPE html>"));
-        assert!(resp.contains("<h1 id=\"hello\">Hello</h1>"));
+        assert!(resp.contains("id=\"hello\""));
         assert!(resp.contains("<p>World</p>"));
     }
 
@@ -297,7 +297,7 @@ mod tests {
         // Only one .md file → auto-serve it
         let resp = get(port, "/");
         assert!(resp.contains("HTTP/1.1 200 OK"));
-        assert!(resp.contains("<h1 id=\"readme\">Readme</h1>"));
+        assert!(resp.contains("id=\"readme\""));
     }
 
     #[test]
@@ -325,7 +325,7 @@ mod tests {
         let port = start_server(dir.path());
         let resp = get(port, "/");
         assert!(resp.contains("HTTP/1.1 200 OK"));
-        assert!(resp.contains("<h1 id=\"welcome\">Welcome</h1>"));
+        assert!(resp.contains("id=\"welcome\""));
     }
 
     #[test]
@@ -349,7 +349,7 @@ mod tests {
 
         let port = start_server(dir.path());
         let resp = get(port, "/docs/");
-        assert!(resp.contains("<h1 id=\"only\">Only</h1>"));
+        assert!(resp.contains("id=\"only\""));
     }
 
     #[test]

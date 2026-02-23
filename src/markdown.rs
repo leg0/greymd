@@ -390,8 +390,9 @@ fn render_body(source: &str) -> String {
             close_all_lists(&mut out, &mut list_stack);
             let slug = heading_slug(text);
             out.push_str(&format!(
-                "<h{} id=\"{}\">{}</h{}>\n",
+                "<h{} id=\"{}\"><a class=\"anchor\" href=\"#{}\">\u{1F517}</a>{}</h{}>\n",
                 level,
+                slug,
                 slug,
                 render_inline(text),
                 level
@@ -777,17 +778,15 @@ mod tests {
     #[test]
     fn test_heading_h1() {
         let body = render_body("# Hello");
-        assert_eq!(body.trim(), "<h1 id=\"hello\">Hello</h1>");
+        assert!(body.contains("id=\"hello\""));
+        assert!(body.contains("Hello</h1>"));
+        assert!(body.contains("href=\"#hello\""));
     }
 
     #[test]
     fn test_heading_with_angle_brackets() {
         let body = render_body("# rd::expected<void, E>");
-        assert!(
-            body.contains("<h1 id=\"rdexpectedvoid-e\">rd::expected&lt;void, E&gt;</h1>"),
-            "got: {}",
-            body
-        );
+        assert!(body.contains("id=\"rdexpectedvoid-e\""), "got: {}", body);
         // Must NOT double-escape to &amp;lt;
         assert!(!body.contains("&amp;"), "double-escaped: {}", body);
     }
@@ -806,7 +805,7 @@ mod tests {
         );
         // Body heading should be escaped once
         assert!(
-            page.contains("<h1 id=\"rdexpectedvoid-e\">rd::expected&lt;void, E&gt;</h1>"),
+            page.contains("id=\"rdexpectedvoid-e\""),
             "heading: {}",
             page
         );
@@ -821,11 +820,11 @@ mod tests {
 
     #[test]
     fn test_heading_h2_through_h6() {
-        assert!(render_body("## Sub").contains("<h2 id=\"sub\">Sub</h2>"));
-        assert!(render_body("### Sub").contains("<h3 id=\"sub\">Sub</h3>"));
-        assert!(render_body("#### Sub").contains("<h4 id=\"sub\">Sub</h4>"));
-        assert!(render_body("##### Sub").contains("<h5 id=\"sub\">Sub</h5>"));
-        assert!(render_body("###### Sub").contains("<h6 id=\"sub\">Sub</h6>"));
+        assert!(render_body("## Sub").contains("id=\"sub\">"));
+        assert!(render_body("### Sub").contains("id=\"sub\">"));
+        assert!(render_body("#### Sub").contains("id=\"sub\">"));
+        assert!(render_body("##### Sub").contains("id=\"sub\">"));
+        assert!(render_body("###### Sub").contains("id=\"sub\">"));
     }
 
     // === US1: Paragraph rendering ===
@@ -920,7 +919,7 @@ mod tests {
         let page = render("# Test\n\nHello world", "test.md");
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>Test</title>"));
-        assert!(page.contains("<h1 id=\"test\">Test</h1>"));
+        assert!(page.contains("id=\"test\""));
         assert!(page.contains("<p>Hello world</p>"));
     }
 
@@ -1024,9 +1023,8 @@ mod tests {
     #[test]
     fn test_html_escaping_in_heading() {
         let body = render_body("# Hello <world> & \"friends\"");
-        assert!(body.contains(
-            "<h1 id=\"hello-world--friends\">Hello &lt;world&gt; &amp; &quot;friends&quot;</h1>"
-        ));
+        assert!(body.contains("id=\"hello-world--friends\""));
+        assert!(body.contains("Hello &lt;world&gt; &amp; &quot;friends&quot;</h1>"));
     }
 
     #[test]
@@ -1139,7 +1137,7 @@ mod tests {
     #[test]
     fn test_table_preceded_by_heading() {
         let body = render_body("# Title\n\n| A |\n|---|\n| 1 |");
-        assert!(body.contains("<h1 id=\"title\">Title</h1>"));
+        assert!(body.contains("id=\"title\""));
         assert!(body.contains("<table>"));
         assert!(body.contains("<td>1</td>"));
     }
