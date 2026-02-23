@@ -52,15 +52,40 @@ fn render_inline(text: &str) -> String {
     let mut i = 0;
 
     while i < len {
-        // Inline code: `...`
-        if chars[i] == '`'
-            && let Some(end) = find_char(&chars, '`', i + 1)
-        {
-            out.push_str("<code>");
-            let code_text: String = chars[i + 1..end].iter().collect();
-            out.push_str(&escape_html(&code_text));
-            out.push_str("</code>");
-            i = end + 1;
+        // Inline code: `...` or ``...`` (multi-backtick spans)
+        if chars[i] == '`' {
+            let mut ticks = 0;
+            while i + ticks < len && chars[i + ticks] == '`' {
+                ticks += 1;
+            }
+            let start = i + ticks;
+            // Find matching closing backtick sequence of same length
+            let mut j = start;
+            let mut found = false;
+            while j <= len - ticks {
+                if chars[j..j + ticks].iter().all(|&c| c == '`') {
+                    found = true;
+                    break;
+                }
+                j += 1;
+            }
+            if found {
+                let mut code_text: String = chars[start..j].iter().collect();
+                // Strip one leading/trailing space if both present (GFM rule)
+                if code_text.starts_with(' ') && code_text.ends_with(' ') && code_text.len() > 1 {
+                    code_text = code_text[1..code_text.len() - 1].to_string();
+                }
+                out.push_str("<code>");
+                out.push_str(&escape_html(&code_text));
+                out.push_str("</code>");
+                i = j + ticks;
+                continue;
+            }
+            // No closing sequence found — emit backticks as literal text
+            for _ in 0..ticks {
+                out.push('`');
+            }
+            i += ticks;
             continue;
         }
 
@@ -872,6 +897,12 @@ mod tests {
     fn test_inline_code_escapes_html() {
         let body = render_body("`<div>`");
         assert!(body.contains("<code>&lt;div&gt;</code>"));
+    }
+
+    #[test]
+    fn test_double_backtick_inline_code() {
+        let body = render_body("`` `code` ``");
+        assert!(body.contains("<code>`code`</code>"));
     }
 
     // === US1: Link rendering ===
