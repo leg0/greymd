@@ -1,5 +1,7 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufReader, Read};
 use std::net::TcpStream;
+
+const MAX_LINE_LEN: usize = 4096;
 
 pub struct HttpRequest {
     pub method: String,
@@ -7,10 +9,34 @@ pub struct HttpRequest {
     pub query: Option<String>,
 }
 
+/// Read a line up to `max` bytes. Returns None on EOF or if the limit is exceeded.
+fn read_line_limited(reader: &mut BufReader<&TcpStream>, max: usize) -> Option<String> {
+    let mut buf = Vec::new();
+    let mut byte = [0u8; 1];
+    loop {
+        match reader.read(&mut byte) {
+            Ok(0) => break,
+            Ok(_) => {
+                buf.push(byte[0]);
+                if byte[0] == b'\n' {
+                    break;
+                }
+                if buf.len() >= max {
+                    return None;
+                }
+            }
+            Err(_) => return None,
+        }
+    }
+    if buf.is_empty() {
+        return None;
+    }
+    String::from_utf8(buf).ok()
+}
+
 impl HttpRequest {
     pub fn parse(stream: &mut BufReader<&TcpStream>) -> Option<Self> {
-        let mut request_line = String::new();
-        stream.read_line(&mut request_line).ok()?;
+        let request_line = read_line_limited(stream, MAX_LINE_LEN)?;
         let mut parts = request_line.trim().splitn(3, ' ');
         let method = parts.next()?.to_string();
         let raw_path = parts.next()?.to_string();
@@ -20,15 +46,11 @@ impl HttpRequest {
         };
         // Consume remaining headers (read until empty line)
         loop {
-            let mut line = String::new();
-            match stream.read_line(&mut line) {
-                Ok(0) => break,
-                Ok(_) => {
-                    if line.trim().is_empty() {
-                        break;
-                    }
-                }
-                Err(_) => break,
+            let Some(line) = read_line_limited(stream, MAX_LINE_LEN) else {
+                break;
+            };
+            if line.trim().is_empty() {
+                break;
             }
         }
         Some(HttpRequest {
