@@ -133,8 +133,8 @@ The lines above and below are horizontal rules (`---`).
 
 | Component | Lines of Code | Module |
 |:----------|:-------------:|-------:|
-| HTTP parser | ~120 | `http.rs` |
-| Markdown renderer | ~700 | `markdown.rs` |
-| Path resolver | ~100 | `path.rs` |
-| Directory listing | ~80 | `listing.rs` |
-| Server | ~200 | `server.rs` |
+| HTTP parser | ~230 | `http.rs` |
+| Markdown renderer | ~1280 | `markdown.rs` |
+| Path resolver | ~170 | `path.rs` |
+| Directory listing | ~190 | `listing.rs` |
+| Server | ~510 | `server.rs` |
