@@ -27,7 +27,7 @@ pub const HLJS_JS_GZ: &[u8] = include_bytes!("assets/highlight.min.js.gz");
 
 pub fn wrap_html_page(title: &str, body: &str) -> String {
     format!(
-        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/?css\">\n</head>\n<body>{}\n<script src=\"/?js\"></script>\n<script>hljs.highlightAll();document.querySelectorAll('pre').forEach(function(p){{var b=document.createElement('button');b.className='copy-btn';b.textContent='\u{1F4CB}';b.onclick=function(){{navigator.clipboard.writeText(p.querySelector('code').textContent).then(function(){{b.textContent='\u{2713}';setTimeout(function(){{b.textContent='\u{1F4CB}'}},1500)}});}};p.appendChild(b)}})</script>\n</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/?css\">\n</head>\n<body>\n<div class=\"content\">{}</div>\n<script src=\"/?js\"></script>\n<script>\nhljs.highlightAll();\ndocument.querySelectorAll('pre').forEach(function(p){{var b=document.createElement('button');b.className='copy-btn';b.textContent='\u{1F4CB}';b.onclick=function(){{navigator.clipboard.writeText(p.querySelector('code').textContent).then(function(){{b.textContent='\u{2713}';setTimeout(function(){{b.textContent='\u{1F4CB}'}},1500)}});}};p.appendChild(b)}});\n(function(){{var hs=document.querySelectorAll('.content h1,.content h2,.content h3,.content h4,.content h5,.content h6');if(hs.length<2)return;var nav=document.createElement('nav');nav.className='toc';var ul=document.createElement('ul');hs.forEach(function(h){{var li=document.createElement('li');li.className='toc-h'+h.tagName[1];var a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent.replace('\u{1F517}','').trim();li.appendChild(a);ul.appendChild(li)}});nav.appendChild(ul);document.body.insertBefore(nav,document.body.firstChild)}})();\n</script>\n</body>\n</html>\n",
         escape_html(title),
         body,
     )
@@ -700,7 +700,7 @@ mod tests {
     #[test]
     fn test_wrap_html_page_empty_body() {
         let page = wrap_html_page("Empty", "");
-        assert!(page.contains("<body>\n<script"));
+        assert!(page.contains("<div class=\"content\">"));
         assert!(page.contains("<link"));
     }
 
