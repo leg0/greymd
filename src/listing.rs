@@ -52,7 +52,7 @@ pub fn collect_entries(dir: &Path) -> Vec<DirectoryEntry> {
 }
 
 /// Render a directory listing as an HTML page.
-pub fn render_listing(url_path: &str, entries: &[DirectoryEntry], show_parent: bool) -> String {
+pub fn render_listing(url_path: &str, entries: &[DirectoryEntry], show_parent: bool, has_custom_css: bool) -> String {
     let mut body = String::new();
 
     let title = if url_path == "/" {
@@ -86,7 +86,7 @@ pub fn render_listing(url_path: &str, entries: &[DirectoryEntry], show_parent: b
     }
 
     body.push('\n');
-    wrap_html_page(&title, &body)
+    wrap_html_page(&title, &body, has_custom_css)
 }
 
 fn parent_url(url_path: &str) -> String {
@@ -148,7 +148,7 @@ mod tests {
                 is_dir: false,
             },
         ];
-        let html = render_listing("/", &entries, false);
+        let html = render_listing("/", &entries, false, false);
         assert!(html.contains("<h1>Index of /</h1>"));
         assert!(html.contains("<a href=\"/docs/\">📁 docs/</a>"));
         assert!(html.contains("<a href=\"/readme.md\">📄 readme.md</a>"));
@@ -158,14 +158,14 @@ mod tests {
     #[test]
     fn render_listing_with_parent() {
         let entries = vec![];
-        let html = render_listing("/sub/dir/", &entries, true);
+        let html = render_listing("/sub/dir/", &entries, true, false);
         assert!(html.contains("<a href=\"/sub/\">📁 ..</a>"));
     }
 
     #[test]
     fn render_listing_no_parent_at_root() {
         let entries = vec![];
-        let html = render_listing("/", &entries, false);
+        let html = render_listing("/", &entries, false, false);
         assert!(!html.contains(".."));
     }
 
@@ -175,7 +175,7 @@ mod tests {
             name: "a<b>.md".into(),
             is_dir: false,
         }];
-        let html = render_listing("/", &entries, false);
+        let html = render_listing("/", &entries, false, false);
         assert!(html.contains("a&lt;b&gt;.md"));
     }
     #[test]

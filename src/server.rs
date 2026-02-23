@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::net::TcpListener;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::http::{HttpRequest, HttpResponse};
 use crate::listing;
@@ -8,30 +8,29 @@ use crate::markdown;
 use crate::mime::content_type_for;
 use crate::path::{ResolvedPath, resolve_path};
 
-pub fn start(root: &Path, port: u16) {
-    let addr = format!("127.0.0.1:{}", port);
-    let listener = match TcpListener::bind(&addr) {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("Error: could not bind to {}: {}", addr, e);
-            std::process::exit(1);
-        }
-    };
-    println!("Listening on http://{}", addr);
+pub fn config_dir() -> Option<PathBuf> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()?;
+    Some(PathBuf::from(home).join(".config").join("greymd"))
+}
 
+pub fn start(listener: TcpListener, root: &Path, css_path: PathBuf, js_path: PathBuf) {
     for stream in listener.incoming() {
         let stream = match stream {
             Ok(s) => s,
             Err(_) => continue,
         };
         let root = root.to_path_buf();
+        let css_path = css_path.clone();
+        let js_path = js_path.clone();
         std::thread::spawn(move || {
-            handle_connection(&stream, &root);
+            handle_connection(&stream, &root, &css_path, &js_path);
         });
     }
 }
 
-fn serve_file(file_path: &Path) -> HttpResponse {
+fn serve_file(file_path: &Path, has_custom_css: bool) -> HttpResponse {
     let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
     if ext.eq_ignore_ascii_case("md") {
         match std::fs::read_to_string(file_path) {
@@ -40,7 +39,7 @@ fn serve_file(file_path: &Path) -> HttpResponse {
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("untitled.md");
-                let html = crate::markdown::render(&source, filename);
+                let html = crate::markdown::render(&source, filename, has_custom_css);
                 HttpResponse::ok("text/html", html.into_bytes())
             }
             Err(_) => HttpResponse::not_found(),
@@ -53,30 +52,30 @@ fn serve_file(file_path: &Path) -> HttpResponse {
     }
 }
 
-fn serve_directory(dir_path: &Path, root: &Path, url_path: &str) -> HttpResponse {
+fn serve_directory(dir_path: &Path, root: &Path, url_path: &str, has_custom_css: bool) -> HttpResponse {
     let entries = listing::collect_entries(dir_path);
 
     // Auto-serve: single .md file
     let md_files: Vec<&listing::DirectoryEntry> = entries.iter().filter(|e| !e.is_dir).collect();
     if md_files.len() == 1 {
         let file_path = dir_path.join(&md_files[0].name);
-        return serve_file(&file_path);
+        return serve_file(&file_path, has_custom_css);
     }
 
     // Auto-serve: index.md when multiple .md files
     if md_files.len() > 1 && md_files.iter().any(|e| e.name == "index.md") {
         let file_path = dir_path.join("index.md");
-        return serve_file(&file_path);
+        return serve_file(&file_path, has_custom_css);
     }
 
     // Fall back to listing
     let root_canonical = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let show_parent = dir_path != root_canonical;
-    let html = listing::render_listing(url_path, &entries, show_parent);
+    let html = listing::render_listing(url_path, &entries, show_parent, has_custom_css);
     HttpResponse::ok("text/html", html.into_bytes())
 }
 
-fn handle_connection(stream: &std::net::TcpStream, root: &Path) {
+fn handle_connection(stream: &std::net::TcpStream, root: &Path, css_path: &Path, js_path: &Path) {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(1)));
     let mut reader = std::io::BufReader::new(stream);
     let request = match HttpRequest::parse(&mut reader) {
@@ -84,19 +83,32 @@ fn handle_connection(stream: &std::net::TcpStream, root: &Path) {
         None => return,
     };
 
+    let has_custom_css = css_path.is_file();
+
     let response = if request.method != "GET" {
         HttpResponse::method_not_allowed()
     } else if let Some(ref q) = request.query {
         match q.as_str() {
             "css" => HttpResponse::ok_gzip("text/css", markdown::CSS_GZ.to_vec()),
-            "js" => HttpResponse::ok_gzip("application/javascript", markdown::HLJS_JS_GZ.to_vec()),
+            "css2" => {
+                match std::fs::read(css_path) {
+                    Ok(content) => HttpResponse::ok("text/css", content),
+                    Err(_) => HttpResponse::not_found(),
+                }
+            }
+            "js" => {
+                match std::fs::read(js_path) {
+                    Ok(content) => HttpResponse::ok("application/javascript", content),
+                    Err(_) => HttpResponse::ok_gzip("application/javascript", markdown::HLJS_JS_GZ.to_vec()),
+                }
+            }
             _ => HttpResponse::not_found(),
         }
     } else {
         match resolve_path(root, &request.path) {
-            Some(ResolvedPath::File(file_path)) => serve_file(&file_path),
+            Some(ResolvedPath::File(file_path)) => serve_file(&file_path, has_custom_css),
             Some(ResolvedPath::Directory(dir_path)) => {
-                serve_directory(&dir_path, root, &request.path)
+                serve_directory(&dir_path, root, &request.path, has_custom_css)
             }
             None => HttpResponse::not_found(),
         }
@@ -120,6 +132,10 @@ mod tests {
     }
 
     fn start_server(root: &Path) -> u16 {
+        start_server_with_config(root, PathBuf::from("/nonexistent/.config/greymd/css"), PathBuf::from("/nonexistent/.config/greymd/js"))
+    }
+
+    fn start_server_with_config(root: &Path, css_path: PathBuf, js_path: PathBuf) -> u16 {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let root = root.to_path_buf();
@@ -130,8 +146,10 @@ mod tests {
                     Err(_) => continue,
                 };
                 let root = root.clone();
+                let css_path = css_path.clone();
+                let js_path = js_path.clone();
                 std::thread::spawn(move || {
-                    handle_connection(&stream, &root);
+                    handle_connection(&stream, &root, &css_path, &js_path);
                 });
             }
         });
@@ -510,5 +528,90 @@ mod tests {
         let resp = get(port, "/doc.md");
         assert!(resp.contains("/?js"));
         assert!(resp.contains("hljs.highlightAll()"));
+    }
+
+    #[test]
+    fn config_dir_returns_path_when_home_set() {
+        let dir = config_dir();
+        // HOME is set in our test environment
+        if std::env::var("HOME").is_ok() || std::env::var("USERPROFILE").is_ok() {
+            let path = dir.unwrap();
+            assert!(path.ends_with(".config/greymd"));
+        }
+    }
+
+    #[test]
+    fn config_dir_path_structure() {
+        // Verify the path is constructed as home + .config/greymd
+        if let Some(home) = std::env::var("HOME").ok().or_else(|| std::env::var("USERPROFILE").ok()) {
+            let expected = PathBuf::from(home).join(".config").join("greymd");
+            assert_eq!(config_dir().unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn css2_serves_custom_css_file() {
+        let dir = setup_test_dir();
+        let css_dir = crate::path::tempdir::TempDir::new();
+        let css_path = css_dir.path().join("css");
+        std::fs::write(&css_path, "body { color: red; }").unwrap();
+        let port = start_server_with_config(dir.path(), css_path, PathBuf::from("/nonexistent/js"));
+        let resp = get(port, "/?css2");
+        assert!(resp.contains("200 OK"));
+        assert!(resp.contains("text/css"));
+        assert!(resp.contains("body { color: red; }"));
+        assert!(!resp.contains("Content-Encoding: gzip"));
+    }
+
+    #[test]
+    fn css2_returns_404_when_no_custom_css() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get(port, "/?css2");
+        assert!(resp.contains("404"));
+    }
+
+    #[test]
+    fn js_serves_custom_js_when_file_exists() {
+        let dir = setup_test_dir();
+        let js_dir = crate::path::tempdir::TempDir::new();
+        let js_path = js_dir.path().join("js");
+        std::fs::write(&js_path, "console.log('custom');").unwrap();
+        let port = start_server_with_config(dir.path(), PathBuf::from("/nonexistent/css"), js_path);
+        let resp = get(port, "/?js");
+        assert!(resp.contains("200 OK"));
+        assert!(resp.contains("application/javascript"));
+        assert!(resp.contains("console.log('custom');"));
+        assert!(!resp.contains("Content-Encoding: gzip"));
+    }
+
+    #[test]
+    fn js_serves_builtin_when_no_custom_js() {
+        let dir = setup_test_dir();
+        let port = start_server(dir.path());
+        let resp = get_bytes(port, "/?js");
+        let header = String::from_utf8_lossy(&resp[..resp.len().min(512)]);
+        assert!(header.contains("200 OK"));
+        assert!(header.contains("Content-Encoding: gzip"));
+    }
+
+    #[test]
+    fn css2_link_appears_when_css_file_created_after_start() {
+        let dir = setup_test_dir();
+        std::fs::write(dir.path().join("test.md"), "# Hello").unwrap();
+        let css_dir = crate::path::tempdir::TempDir::new();
+        let css_path = css_dir.path().join("css");
+        let port = start_server_with_config(dir.path(), css_path.clone(), PathBuf::from("/nonexistent/js"));
+
+        // Before CSS file exists: no css2 link
+        let resp = get(port, "/test.md");
+        assert!(!resp.contains("/?css2"), "should not have css2 link before file exists");
+
+        // Create CSS file
+        std::fs::write(&css_path, "body { color: blue; }").unwrap();
+
+        // After CSS file exists: css2 link appears
+        let resp = get(port, "/test.md");
+        assert!(resp.contains("/?css2"), "should have css2 link after file created");
     }
 }

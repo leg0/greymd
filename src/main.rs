@@ -6,9 +6,16 @@ mod path;
 mod server;
 
 use std::env;
+use std::net::TcpListener;
 use std::path::PathBuf;
 
-const DEFAULT_PORT: u16 = 8080;
+fn bind_listener() -> TcpListener {
+    match TcpListener::bind("127.0.0.1:8080") {
+        Ok(l) => l,
+        Err(_) => TcpListener::bind("127.0.0.1:0")
+            .expect("Failed to bind to any port"),
+    }
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -32,7 +39,17 @@ fn main() {
         std::process::exit(1);
     }
 
-    server::start(&root, DEFAULT_PORT);
+    let (css_path, js_path) = if let Some(config) = server::config_dir() {
+        (config.join("css"), config.join("js"))
+    } else {
+        (PathBuf::new(), PathBuf::new())
+    };
+
+    let listener = bind_listener();
+    let addr = listener.local_addr().unwrap();
+    println!("Listening on http://{}", addr);
+
+    server::start(listener, &root, css_path, js_path);
 }
 
 fn print_usage() {
@@ -45,4 +62,36 @@ fn print_usage() {
     println!();
     println!("Options:");
     println!("  -h, --help   Show this help message");
+    println!();
+    println!("Customization:");
+    println!("  ~/.config/greymd/css   Custom stylesheet (appended after built-in)");
+    println!("  ~/.config/greymd/js    Custom JavaScript (replaces built-in highlight.js)");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bind_listener_returns_listener_on_8080_when_available() {
+        // This test may get port 8080 or a random port depending on environment
+        let listener = bind_listener();
+        let addr = listener.local_addr().unwrap();
+        assert_eq!(addr.ip(), std::net::Ipv4Addr::LOCALHOST);
+        assert_ne!(addr.port(), 0);
+    }
+
+    #[test]
+    fn bind_listener_falls_back_when_8080_busy() {
+        // Grab port 8080 first
+        let blocker = TcpListener::bind("127.0.0.1:8080");
+        let listener = bind_listener();
+        let addr = listener.local_addr().unwrap();
+        assert_eq!(addr.ip(), std::net::Ipv4Addr::LOCALHOST);
+        if blocker.is_ok() {
+            // We successfully blocked 8080, so bind_listener must have picked another port
+            assert_ne!(addr.port(), 8080);
+        }
+        assert_ne!(addr.port(), 0);
+    }
 }
