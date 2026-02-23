@@ -64,7 +64,7 @@ Visit [the Rust homepage](https://www.rust-lang.org) for more info.
 
 ## Code Blocks
 
-### Fenced (with language hint)
+### Fenced code block (with language hint for syntax highlighting)
 
 ```rust
 fn main() {
@@ -77,7 +77,7 @@ fn main() {
 cargo build && cargo run -- ./docs
 ```
 
-### Indented
+### Indented code block (4-space indent, no syntax highlighting)
 
     This is an indented code block.
     It preserves    spacing and <html> entities.
