@@ -17,6 +17,8 @@ This page showcases every Markdown feature supported by **greymd**.
 
 This is **bold text**, this is *italic text*, and this is ***bold and italic***.
 
+This is ~~strikethrough~~ text.
+
 You can also use inline `code` within a sentence.
 
 Special characters are escaped: <div>, &amp;, and "quotes" work safely.
@@ -26,6 +28,8 @@ Special characters are escaped: <div>, &amp;, and "quotes" work safely.
 ## Links and Images
 
 Visit [the Rust homepage](https://www.rust-lang.org) for more info.
+
+Bare URLs are auto-linked: https://www.rust-lang.org
 
 ![Rust logo](https://www.rust-lang.org/logos/rust-logo-128x128.png)
 
@@ -59,6 +63,13 @@ Visit [the Rust homepage](https://www.rust-lang.org) for more info.
 3. Run the server
    1. Pass a directory path
    2. Open the browser
+
+### Task List
+
+- [x] Implement markdown rendering
+- [x] Add syntax highlighting
+- [ ] Add dark mode
+- [ ] ~~Add live reload~~
 
 ---
 

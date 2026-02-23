@@ -94,6 +94,8 @@ blockquote {
 }
 ul, ol { padding-left: 2em; }
 li { padding: 0.25em 0; }
+li input[type="checkbox"] { margin-right: 0.4em; }
+li:has(input[type="checkbox"]) { list-style: none; }
 hr {
     border: none;
     border-top: 1px solid #e1e4e8;

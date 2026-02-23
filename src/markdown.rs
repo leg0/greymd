@@ -132,6 +132,20 @@ fn render_inline(text: &str) -> String {
             continue;
         }
 
+        // Strikethrough: ~~text~~
+        if i + 1 < len
+            && chars[i] == '~'
+            && chars[i + 1] == '~'
+            && let Some(end) = find_sequence(&chars, &['~', '~'], i + 2)
+        {
+            let inner: String = chars[i + 2..end].iter().collect();
+            out.push_str("<del>");
+            out.push_str(&render_inline(&inner));
+            out.push_str("</del>");
+            i = end + 2;
+            continue;
+        }
+
         // Bold: **text**
         if i + 1 < len
             && chars[i] == '*'
@@ -158,6 +172,19 @@ fn render_inline(text: &str) -> String {
             continue;
         }
 
+        // Auto-link: bare URLs (https:// or http://)
+        if chars[i] == 'h'
+            && let Some(url) = try_parse_url(&chars, i)
+        {
+            out.push_str(&format!(
+                "<a href=\"{}\">{}</a>",
+                escape_html(&url),
+                escape_html(&url)
+            ));
+            i += url.len();
+            continue;
+        }
+
         // Regular character — escape HTML
         match chars[i] {
             '<' => out.push_str("&lt;"),
@@ -181,6 +208,32 @@ fn find_sequence(chars: &[char], seq: &[char], start: usize) -> Option<usize> {
         return None;
     }
     (start..=chars.len() - slen).find(|&i| chars[i..i + slen] == *seq)
+}
+
+/// Try to parse a bare URL starting at position `start`.
+fn try_parse_url(chars: &[char], start: usize) -> Option<String> {
+    let rest: String = chars[start..].iter().collect();
+    let prefix = if rest.starts_with("https://") {
+        "https://"
+    } else if rest.starts_with("http://") {
+        "http://"
+    } else {
+        return None;
+    };
+    // URL ends at whitespace, or certain trailing punctuation
+    let after_prefix = &rest[prefix.len()..];
+    if after_prefix.is_empty() {
+        return None;
+    }
+    let end = rest
+        .find(|c: char| c.is_whitespace() || c == '<' || c == '>' || c == '"')
+        .unwrap_or(rest.len());
+    // Strip trailing punctuation that's likely not part of the URL
+    let url = rest[..end].trim_end_matches(|c: char| ".,;:!?)".contains(c));
+    if url.len() <= prefix.len() {
+        return None;
+    }
+    Some(url.to_string())
 }
 
 fn parse_link_or_image(chars: &[char], bracket_start: usize) -> Option<(String, String, usize)> {
@@ -643,7 +696,23 @@ fn handle_list_item(
         stack.push(ListEntry { kind, indent });
     }
 
-    out.push_str(&format!("<li>{}</li>\n", render_inline(text)));
+    // Task list items: - [ ] or - [x]
+    if let Some(rest) = text.strip_prefix("[ ] ") {
+        out.push_str(&format!(
+            "<li><input type=\"checkbox\" disabled> {}</li>\n",
+            render_inline(rest)
+        ));
+    } else if let Some(rest) = text
+        .strip_prefix("[x] ")
+        .or_else(|| text.strip_prefix("[X] "))
+    {
+        out.push_str(&format!(
+            "<li><input type=\"checkbox\" checked disabled> {}</li>\n",
+            render_inline(rest)
+        ));
+    } else {
+        out.push_str(&format!("<li>{}</li>\n", render_inline(text)));
+    }
 }
 
 fn close_list_top(out: &mut String, stack: &mut Vec<ListEntry>) {
@@ -911,6 +980,61 @@ mod tests {
     fn test_link() {
         let body = render_body("[click here](https://example.com)");
         assert!(body.contains("<a href=\"https://example.com\">click here</a>"));
+    }
+
+    // === Strikethrough ===
+
+    #[test]
+    fn test_strikethrough() {
+        let body = render_body("~~deleted~~");
+        assert!(body.contains("<del>deleted</del>"));
+    }
+
+    #[test]
+    fn test_strikethrough_with_inline() {
+        let body = render_body("~~**bold** deleted~~");
+        assert!(body.contains("<del><strong>bold</strong> deleted</del>"));
+    }
+
+    // === Auto-linking ===
+
+    #[test]
+    fn test_autolink_https() {
+        let body = render_body("Visit https://example.com for info");
+        assert!(body.contains("<a href=\"https://example.com\">https://example.com</a>"));
+    }
+
+    #[test]
+    fn test_autolink_strips_trailing_punctuation() {
+        let body = render_body("See https://example.com.");
+        assert!(body.contains("<a href=\"https://example.com\">https://example.com</a>."));
+    }
+
+    #[test]
+    fn test_autolink_http() {
+        let body = render_body("http://example.com works too");
+        assert!(body.contains("<a href=\"http://example.com\">http://example.com</a>"));
+    }
+
+    // === Task lists ===
+
+    #[test]
+    fn test_task_list_unchecked() {
+        let body = render_body("- [ ] todo item");
+        assert!(body.contains("<input type=\"checkbox\" disabled> todo item"));
+    }
+
+    #[test]
+    fn test_task_list_checked() {
+        let body = render_body("- [x] done item");
+        assert!(body.contains("<input type=\"checkbox\" checked disabled> done item"));
+    }
+
+    #[test]
+    fn test_task_list_mixed() {
+        let body = render_body("- [x] done\n- [ ] pending");
+        assert!(body.contains("checked disabled> done"));
+        assert!(body.contains("checkbox\" disabled> pending"));
     }
 
     // === US1: Fenced code block ===
