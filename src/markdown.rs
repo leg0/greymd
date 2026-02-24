@@ -65,11 +65,15 @@ fn render_inline(text: &str) -> String {
                 ticks += 1;
             }
             let start = i + ticks;
-            // Find matching closing backtick sequence of same length
+            // Find matching closing backtick sequence of exactly the same length
+            // (not preceded or followed by additional backticks)
             let mut j = start;
             let mut found = false;
             while j <= len - ticks {
-                if chars[j..j + ticks].iter().all(|&c| c == '`') {
+                if chars[j..j + ticks].iter().all(|&c| c == '`')
+                    && (j == start || chars[j - 1] != '`')
+                    && (j + ticks >= len || chars[j + ticks] != '`')
+                {
                     found = true;
                     break;
                 }
@@ -993,6 +997,13 @@ mod tests {
     fn test_double_backtick_inline_code() {
         let body = render_body("`` `code` ``");
         assert!(body.contains("<code>`code`</code>"));
+    }
+
+    #[test]
+    fn test_backtick_span_containing_backticks() {
+        // Single-backtick delimiters wrapping triple backticks: ` ``` `
+        let body = render_body("text (` ``` `) more");
+        assert!(body.contains("<code>```</code>"), "body was: {}", body);
     }
 
     // === US1: Link rendering ===
