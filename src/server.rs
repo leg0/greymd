@@ -614,4 +614,50 @@ mod tests {
         let resp = get(port, "/test.md");
         assert!(resp.contains("/?css2"), "should have css2 link after file created");
     }
+
+    // T004: theme dir with css → pick_asset_path → server serves at /?css2 and HTML includes link
+    #[test]
+    fn theme_css_served_via_pick_asset_path() {
+        let dir = setup_test_dir();
+        std::fs::write(dir.path().join("page.md"), "# Themed").unwrap();
+
+        let theme_dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(theme_dir.path().join("css"), "body { background: #1e1e2e; }").unwrap();
+
+        let td = Some(theme_dir.path().to_path_buf());
+        let css_path = crate::pick_asset_path(&td, &None, "css");
+        let js_path = crate::pick_asset_path(&td, &None, "js");
+
+        let port = start_server_with_config(dir.path(), css_path, js_path);
+
+        // HTML page should include /?css2 link
+        let html = get(port, "/page.md");
+        assert!(html.contains("/?css2"), "themed page should have css2 link");
+
+        // /?css2 should serve the theme CSS
+        let css = get(port, "/?css2");
+        assert!(css.contains("200 OK"));
+        assert!(css.contains("body { background: #1e1e2e; }"));
+    }
+
+    // T005: theme dir with js → pick_asset_path → server serves custom JS at /?js
+    #[test]
+    fn theme_js_served_via_pick_asset_path() {
+        let dir = setup_test_dir();
+
+        let theme_dir = crate::path::tempdir::TempDir::new();
+        std::fs::write(theme_dir.path().join("js"), "alert('theme');").unwrap();
+
+        let td = Some(theme_dir.path().to_path_buf());
+        let css_path = crate::pick_asset_path(&td, &None, "css");
+        let js_path = crate::pick_asset_path(&td, &None, "js");
+
+        let port = start_server_with_config(dir.path(), css_path, js_path);
+
+        let resp = get(port, "/?js");
+        assert!(resp.contains("200 OK"));
+        assert!(resp.contains("alert('theme');"));
+        // Should NOT be gzipped (custom JS is served raw)
+        assert!(!resp.contains("Content-Encoding: gzip"));
+    }
 }

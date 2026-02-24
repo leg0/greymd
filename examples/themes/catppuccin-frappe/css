@@ -1,0 +1,39 @@
+/* Catppuccin Frappé — muted dark theme */
+
+body { background: #303446; color: #c6d0f5; }
+a { color: #8caaee; }
+a:hover { color: #babbf1; }
+h1, h2 { border-bottom-color: #414559; }
+h6 { color: #838ba7; }
+code { background: #414559; }
+pre { background: #414559; border-color: #51576d; }
+pre code { background: none; }
+.copy-btn { background: #51576d; color: #c6d0f5; }
+.copy-btn:hover { background: #626880; }
+blockquote { border-left-color: #51576d; color: #949cbb; }
+hr { border-top-color: #414559; }
+th, td { border-color: #51576d; }
+th { background: #414559; }
+.toc { background: #292c3c; border-right-color: #414559; }
+.toc a { color: #c6d0f5; }
+.toc a:hover { color: #8caaee; }
+
+/* highlight.js — Catppuccin Frappé */
+.hljs { color: #c6d0f5; background: #414559; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #ca9ee6; }
+.hljs-string, .hljs-attr { color: #a6d189; }
+.hljs-number, .hljs-literal { color: #ef9f76; }
+.hljs-comment, .hljs-quote { color: #737994; font-style: italic; }
+.hljs-function .hljs-title, .hljs-title.function_ { color: #8caaee; }
+.hljs-type, .hljs-title.class_ { color: #e5c890; }
+.hljs-variable, .hljs-template-variable { color: #c6d0f5; }
+.hljs-meta { color: #ef9f76; }
+.hljs-tag { color: #ca9ee6; }
+.hljs-name { color: #8caaee; }
+.hljs-attribute { color: #e5c890; }
+.hljs-symbol, .hljs-bullet { color: #81c8be; }
+.hljs-addition { color: #a6d189; background: rgba(166, 209, 137, 0.1); }
+.hljs-deletion { color: #e78284; background: rgba(231, 130, 132, 0.1); }
+.hljs-section { color: #8caaee; font-weight: bold; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }

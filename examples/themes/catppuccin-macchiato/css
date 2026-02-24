@@ -1,0 +1,39 @@
+/* Catppuccin Macchiato — gentle dark theme */
+
+body { background: #24273a; color: #cad3f5; }
+a { color: #8aadf4; }
+a:hover { color: #b7bdf8; }
+h1, h2 { border-bottom-color: #363a4f; }
+h6 { color: #8087a2; }
+code { background: #363a4f; }
+pre { background: #363a4f; border-color: #494d64; }
+pre code { background: none; }
+.copy-btn { background: #494d64; color: #cad3f5; }
+.copy-btn:hover { background: #5b6078; }
+blockquote { border-left-color: #494d64; color: #939ab7; }
+hr { border-top-color: #363a4f; }
+th, td { border-color: #494d64; }
+th { background: #363a4f; }
+.toc { background: #1e2030; border-right-color: #363a4f; }
+.toc a { color: #cad3f5; }
+.toc a:hover { color: #8aadf4; }
+
+/* highlight.js — Catppuccin Macchiato */
+.hljs { color: #cad3f5; background: #363a4f; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #c6a0f6; }
+.hljs-string, .hljs-attr { color: #a6da95; }
+.hljs-number, .hljs-literal { color: #f5a97f; }
+.hljs-comment, .hljs-quote { color: #6e738d; font-style: italic; }
+.hljs-function .hljs-title, .hljs-title.function_ { color: #8aadf4; }
+.hljs-type, .hljs-title.class_ { color: #eed49f; }
+.hljs-variable, .hljs-template-variable { color: #cad3f5; }
+.hljs-meta { color: #f5a97f; }
+.hljs-tag { color: #c6a0f6; }
+.hljs-name { color: #8aadf4; }
+.hljs-attribute { color: #eed49f; }
+.hljs-symbol, .hljs-bullet { color: #8bd5ca; }
+.hljs-addition { color: #a6da95; background: rgba(166, 218, 149, 0.1); }
+.hljs-deletion { color: #ed8796; background: rgba(237, 135, 150, 0.1); }
+.hljs-section { color: #8aadf4; font-weight: bold; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }

@@ -1,0 +1,40 @@
+/* Catppuccin Latte — light theme */
+
+body { background: #eff1f5; color: #4c4f69; }
+.content { }
+a { color: #1e66f5; }
+a:hover { color: #7287fd; }
+h1, h2 { border-bottom-color: #ccd0da; }
+h6 { color: #8c8fa1; }
+code { background: #e6e9ef; }
+pre { background: #e6e9ef; border-color: #ccd0da; }
+pre code { background: none; }
+.copy-btn { background: #ccd0da; }
+.copy-btn:hover { background: #bcc0cc; }
+blockquote { border-left-color: #ccd0da; color: #7c7f93; }
+hr { border-top-color: #ccd0da; }
+th, td { border-color: #ccd0da; }
+th { background: #e6e9ef; }
+.toc { background: #e6e9ef; border-right-color: #ccd0da; }
+.toc a { color: #4c4f69; }
+.toc a:hover { color: #1e66f5; }
+
+/* highlight.js — Catppuccin Latte */
+.hljs { color: #4c4f69; background: #e6e9ef; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #8839ef; }
+.hljs-string, .hljs-attr { color: #40a02b; }
+.hljs-number, .hljs-literal { color: #fe640b; }
+.hljs-comment, .hljs-quote { color: #9ca0b0; font-style: italic; }
+.hljs-function .hljs-title, .hljs-title.function_ { color: #1e66f5; }
+.hljs-type, .hljs-title.class_ { color: #df8e1d; }
+.hljs-variable, .hljs-template-variable { color: #4c4f69; }
+.hljs-meta { color: #fe640b; }
+.hljs-tag { color: #8839ef; }
+.hljs-name { color: #1e66f5; }
+.hljs-attribute { color: #df8e1d; }
+.hljs-symbol, .hljs-bullet { color: #179299; }
+.hljs-addition { color: #40a02b; background: rgba(64, 160, 43, 0.1); }
+.hljs-deletion { color: #d20f39; background: rgba(210, 15, 57, 0.1); }
+.hljs-section { color: #1e66f5; font-weight: bold; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }

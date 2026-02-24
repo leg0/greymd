@@ -19,7 +19,7 @@ If you want a simple, fast, self-contained way to read markdown in a browser, gr
 ## Usage
 
 ```sh
-greymd [directory]
+greymd [options] [directory]
 ```
 
 Opens an HTTP server on `localhost` serving the contents of `directory` (defaults to the current directory). Navigate to any `.md` file path in your browser to see it rendered as HTML.
@@ -64,6 +64,39 @@ Place files at these well-known paths to customize greymd's appearance:
 - **`~/.config/greymd/js`** — Custom JavaScript that replaces the built-in highlight.js. Use this to bring your own syntax highlighter or add custom behavior.
 
 File contents are re-read on every request, so you can add, edit, or remove custom files and refresh without restarting.
+
+## Themes
+
+Bundled themes are installed to `<prefix>/share/greymd/themes/`. Use `--theme` to activate one:
+
+```sh
+greymd --theme catppuccin-mocha
+greymd --list-themes
+```
+
+Available themes: `default`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`, `tokyo-night`.
+
+Theme files override `~/.config/greymd/` only for the assets they contain. For example, if a theme only has a `css` file, your `~/.config/greymd/js` still applies.
+
+If a theme is not found (e.g. when installed via `cargo install`, which only installs the binary), greymd prints a warning and falls back to the default appearance.
+
+### Release archives
+
+Release `.tar.gz` and `.zip` archives include themes in the standard layout:
+
+```
+greymd-<version>-<target>/
+├── bin/greymd
+└── share/greymd/themes/
+    ├── default/css
+    ├── catppuccin-latte/css
+    ├── catppuccin-frappe/css
+    ├── catppuccin-macchiato/css
+    ├── catppuccin-mocha/css
+    └── tokyo-night/css
+```
+
+Extract to any prefix (e.g. `/usr/local/` or `~/.local/`) and `--theme` will find them automatically.
 
 ## Building
 

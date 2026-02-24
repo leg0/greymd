@@ -38,15 +38,27 @@ jobs:
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          cargo install --path . --root pkg --no-track --target ${{ matrix.target }}
-          tar czf ${{ matrix.artifact }}.tar.gz -C pkg bin/greymd
+          mkdir -p pkg/bin pkg/share/greymd/themes
+          cp target/${{ matrix.target }}/release/greymd pkg/bin/
+          for d in examples/themes/*/; do
+            name=$(basename "$d")
+            mkdir -p "pkg/share/greymd/themes/$name"
+            cp "$d"* "pkg/share/greymd/themes/$name/" 2>/dev/null || true
+          done
+          tar czf ${{ matrix.artifact }}.tar.gz -C pkg bin share
           rm -r pkg
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
-          cargo install --path . --root pkg --no-track --target ${{ matrix.target }}
-          Compress-Archive -Path "pkg/bin/greymd.exe" -DestinationPath "${{ matrix.artifact }}.zip"
+          New-Item -ItemType Directory -Force -Path pkg/bin, pkg/share/greymd/themes
+          Copy-Item "target/${{ matrix.target }}/release/greymd.exe" pkg/bin/
+          Get-ChildItem examples/themes -Directory | ForEach-Object {
+            $dest = "pkg/share/greymd/themes/$($_.Name)"
+            New-Item -ItemType Directory -Force -Path $dest
+            Copy-Item "$($_.FullName)/*" $dest/
+          }
+          Compress-Archive -Path "pkg/bin", "pkg/share" -DestinationPath "${{ matrix.artifact }}.zip"
           Remove-Item -Recurse "pkg"
 
       - uses: actions/upload-artifact@v4

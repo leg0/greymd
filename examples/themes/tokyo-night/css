@@ -1,0 +1,39 @@
+/* Tokyo Night — dark theme */
+
+body { background: #1a1b26; color: #a9b1d6; }
+a { color: #7aa2f7; }
+a:hover { color: #7dcfff; }
+h1, h2 { border-bottom-color: #414868; }
+h6 { color: #565f89; }
+code { background: #292e42; }
+pre { background: #292e42; border-color: #414868; }
+pre code { background: none; }
+.copy-btn { background: #414868; color: #a9b1d6; }
+.copy-btn:hover { background: #565f89; }
+blockquote { border-left-color: #414868; color: #565f89; }
+hr { border-top-color: #414868; }
+th, td { border-color: #414868; }
+th { background: #292e42; }
+.toc { background: #16161e; border-right-color: #414868; }
+.toc a { color: #a9b1d6; }
+.toc a:hover { color: #7aa2f7; }
+
+/* highlight.js — Tokyo Night */
+.hljs { color: #a9b1d6; background: #292e42; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #bb9af7; }
+.hljs-string, .hljs-attr { color: #9ece6a; }
+.hljs-number, .hljs-literal { color: #ff9e64; }
+.hljs-comment, .hljs-quote { color: #565f89; font-style: italic; }
+.hljs-function .hljs-title, .hljs-title.function_ { color: #7aa2f7; }
+.hljs-type, .hljs-title.class_ { color: #2ac3de; }
+.hljs-variable, .hljs-template-variable { color: #c0caf5; }
+.hljs-meta { color: #ff9e64; }
+.hljs-tag { color: #f7768e; }
+.hljs-name { color: #7aa2f7; }
+.hljs-attribute { color: #e0af68; }
+.hljs-symbol, .hljs-bullet { color: #2ac3de; }
+.hljs-addition { color: #9ece6a; background: rgba(158, 206, 106, 0.1); }
+.hljs-deletion { color: #f7768e; background: rgba(247, 118, 142, 0.1); }
+.hljs-section { color: #7aa2f7; font-weight: bold; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }
