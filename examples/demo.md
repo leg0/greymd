@@ -21,6 +21,8 @@ This is ~~strikethrough~~ text.
 
 You can also use inline `code` within a sentence.
 
+Double-backtick spans let you include literal backticks: `` `code` `` renders as `code` with backticks.
+
 Special characters are escaped: <div>, &amp;, and "quotes" work safely.
 
 ---
@@ -49,12 +51,17 @@ Bare URLs are auto-linked: https://www.rust-lang.org
 
 ### Unordered
 
-- First item
-- Second item with **bold**
-- Third item
+- Dash item
+- Second dash item
   - Nested item A
   - Nested item B
     - Deeply nested
+
+* Asterisk item
+* Another asterisk item
+
++ Plus item
++ Another plus item
 
 ### Ordered
 
@@ -129,9 +136,13 @@ cargo build && cargo run -- ./docs
 
 ## Horizontal Rules
 
-The lines above and below are horizontal rules (`---`).
+All three styles render the same way:
 
 ---
+
+***
+
+___
 
 ## Putting It All Together
 
@@ -145,7 +156,7 @@ The lines above and below are horizontal rules (`---`).
 | Component | Lines of Code | Module |
 |:----------|:-------------:|-------:|
 | HTTP parser | ~230 | `http.rs` |
-| Markdown renderer | ~1280 | `markdown.rs` |
+| Markdown renderer | ~1440 | `markdown.rs` |
 | Path resolver | ~170 | `path.rs` |
 | Directory listing | ~190 | `listing.rs` |
-| Server | ~510 | `server.rs` |
+| Server | ~620 | `server.rs` |
