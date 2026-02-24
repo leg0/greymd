@@ -17,9 +17,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: greymd-linux-x64
+            features: ""
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: greymd-math-linux-x64
+            features: math
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: greymd-windows-x64
+            features: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: greymd-math-windows-x64
+            features: math
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -30,10 +40,10 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} ${{ matrix.features && format('--features {0}', matrix.features) || '' }}
 
       - name: Run tests
-        run: cargo test --release --target ${{ matrix.target }}
+        run: cargo test --release --target ${{ matrix.target }} ${{ matrix.features && format('--features {0}', matrix.features) || '' }}
 
       - name: Package (Linux)
         if: runner.os == 'Linux'

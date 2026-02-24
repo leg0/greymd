@@ -10,10 +10,17 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "greymd"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
+ "latex2mathml",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "latex2mathml"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "678cf5bdb3ba63a264e6e0c9eee36538ca1d2da0afa4dd801c1f96309e710765"
 
 [[package]]
 name = "miniz_oxide"

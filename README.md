@@ -98,12 +98,32 @@ greymd-<version>-<target>/
 
 Extract to any prefix (e.g. `/usr/local/` or `~/.local/`) and `--theme` will find them automatically.
 
+## Math Rendering
+
+greymd supports optional LaTeX math rendering via a compile-time feature flag:
+
+```sh
+cargo build --release --features math
+```
+
+When enabled, LaTeX expressions are converted server-side to MathML:
+
+- **Inline math**: `$x^2$` renders inline within text
+- **Display math**: `$$\int_0^1 f(x)\,dx$$` renders as a centered block
+
+Without the feature, `$...$` and `$$...$$` pass through unchanged.
+
+Pre-built release archives are available in both standard and `-math` variants.
+
+See `examples/math-demo.md` for a full demonstration.
+
 ## Building
 
 Requires Rust 1.85+ (edition 2024).
 
 ```sh
-cargo build --release
+cargo build --release                  # standard build
+cargo build --release --features math  # with math rendering
 ```
 
 ## Design Goals

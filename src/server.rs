@@ -484,6 +484,7 @@ mod tests {
         let resp = get(port, "/doc.md");
         assert!(resp.contains("/?css"));
         assert!(resp.contains("<link"));
+        #[cfg(not(feature = "math"))]
         assert!(!resp.contains("<style>"));
     }
 
@@ -496,6 +497,7 @@ mod tests {
         let resp = get(port, "/");
         assert!(resp.contains("/?css"));
         assert!(resp.contains("<link"));
+        #[cfg(not(feature = "math"))]
         assert!(!resp.contains("<style>"));
     }
 
@@ -659,5 +661,19 @@ mod tests {
         assert!(resp.contains("alert('theme');"));
         // Should NOT be gzipped (custom JS is served raw)
         assert!(!resp.contains("Content-Encoding: gzip"));
+    }
+
+    // T013: Math content passes through as plain text in default build
+    #[cfg(not(feature = "math"))]
+    #[test]
+    fn math_content_passthrough_without_feature() {
+        let dir = setup_test_dir();
+        std::fs::write(dir.path().join("math.md"), "Inline $x^2$ and display:\n\n$$\\sum x$$\n").unwrap();
+        let port = start_server(dir.path());
+        let resp = get(port, "/math.md");
+        assert!(resp.contains("200 OK"));
+        assert!(resp.contains("$x^2$"), "inline math should pass through");
+        assert!(resp.contains("$$"), "display math should pass through");
+        assert!(!resp.contains("<math"), "should not contain MathML");
     }
 }

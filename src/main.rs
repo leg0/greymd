@@ -185,6 +185,13 @@ fn print_usage() {
     println!();
     println!("Theme files override ~/.config/greymd/ for files they contain.");
     println!("CSS and JS are re-read on every request.");
+    #[cfg(feature = "math")]
+    {
+        println!();
+        println!("Math rendering:          Enabled (LaTeX → MathML)");
+        println!("  $...$                  Inline math");
+        println!("  $$...$$                Display math (block-level)");
+    }
 }
 
 #[cfg(test)]

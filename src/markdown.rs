@@ -31,10 +31,15 @@ pub fn wrap_html_page(title: &str, body: &str, has_custom_css: bool) -> String {
     } else {
         ""
     };
+    #[cfg(feature = "math")]
+    let math_css = "\n<style>math { font-family: \"STIX Two Math\", \"Latin Modern Math\", math; }</style>";
+    #[cfg(not(feature = "math"))]
+    let math_css = "";
     format!(
-        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<link rel=\"icon\" href=\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text x='0' y='13' font-size='12' font-family='sans-serif' font-weight='bold'>M↓</text></svg>\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/?css\">{}\n</head>\n<body>\n<div class=\"content\">{}</div>\n<script src=\"/?js\"></script>\n<script>\nhljs.highlightAll();\ndocument.querySelectorAll('pre').forEach(function(p){{var b=document.createElement('button');b.className='copy-btn';b.textContent='\u{1F4CB}';b.onclick=function(){{navigator.clipboard.writeText(p.querySelector('code').textContent).then(function(){{b.textContent='\u{2713}';setTimeout(function(){{b.textContent='\u{1F4CB}'}},1500)}});}};p.appendChild(b)}});\n(function(){{var hs=document.querySelectorAll('.content h1,.content h2,.content h3,.content h4,.content h5,.content h6');if(hs.length<2)return;var nav=document.createElement('nav');nav.className='toc';var ul=document.createElement('ul');hs.forEach(function(h){{var li=document.createElement('li');li.className='toc-h'+h.tagName[1];var a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent.replace('\u{1F517}','').trim();li.appendChild(a);ul.appendChild(li)}});nav.appendChild(ul);document.body.insertBefore(nav,document.body.firstChild)}})();\n</script>\n</body>\n</html>\n",
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<link rel=\"icon\" href=\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text x='0' y='13' font-size='12' font-family='sans-serif' font-weight='bold'>M↓</text></svg>\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/?css\">{}{}\n</head>\n<body>\n<div class=\"content\">{}</div>\n<script src=\"/?js\"></script>\n<script>\nhljs.highlightAll();\ndocument.querySelectorAll('pre').forEach(function(p){{var b=document.createElement('button');b.className='copy-btn';b.textContent='\u{1F4CB}';b.onclick=function(){{navigator.clipboard.writeText(p.querySelector('code').textContent).then(function(){{b.textContent='\u{2713}';setTimeout(function(){{b.textContent='\u{1F4CB}'}},1500)}});}};p.appendChild(b)}});\n(function(){{var hs=document.querySelectorAll('.content h1,.content h2,.content h3,.content h4,.content h5,.content h6');if(hs.length<2)return;var nav=document.createElement('nav');nav.className='toc';var ul=document.createElement('ul');hs.forEach(function(h){{var li=document.createElement('li');li.className='toc-h'+h.tagName[1];var a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent.replace('\u{1F517}','').trim();li.appendChild(a);ul.appendChild(li)}});nav.appendChild(ul);document.body.insertBefore(nav,document.body.firstChild)}})();\n</script>\n</body>\n</html>\n",
         escape_html(title),
         css2_link,
+        math_css,
         body,
     )
 }
@@ -97,6 +102,75 @@ fn render_inline(text: &str) -> String {
             }
             i += ticks;
             continue;
+        }
+
+        // Escaped dollar sign: \$ → literal $
+        if chars[i] == '\\' && i + 1 < len && chars[i + 1] == '$' {
+            out.push('$');
+            i += 2;
+            continue;
+        }
+
+        // Inline math: $...$ (not followed by space at open, not preceded by space at close)
+        if chars[i] == '$' && i + 1 < len && chars[i + 1] != ' ' && chars[i + 1] != '$' {
+            // Find closing $ (not preceded by space, not followed by $)
+            // Skip over backtick-delimited spans to avoid matching $ inside code
+            let start = i + 1;
+            let mut j = start;
+            let mut found = false;
+            while j < len {
+                // Skip backtick spans inside the math candidate
+                if chars[j] == '`' {
+                    let mut bt = 0;
+                    while j + bt < len && chars[j + bt] == '`' {
+                        bt += 1;
+                    }
+                    let inner = j + bt;
+                    let mut k = inner;
+                    let mut closed = false;
+                    while k <= len - bt {
+                        if chars[k..k + bt].iter().all(|&c| c == '`') {
+                            closed = true;
+                            j = k + bt;
+                            break;
+                        }
+                        k += 1;
+                    }
+                    if closed {
+                        continue;
+                    }
+                    // unclosed backtick span — treat backticks as literal, keep scanning
+                    j += bt;
+                    continue;
+                }
+                if chars[j] == '$' && chars[j - 1] != ' ' && (j + 1 >= len || chars[j + 1] != '$') {
+                    found = true;
+                    break;
+                }
+                j += 1;
+            }
+            if found && j > start {
+                let latex: String = chars[start..j].iter().collect();
+                #[cfg(feature = "math")]
+                {
+                    match latex2mathml::latex_to_mathml(&latex, latex2mathml::DisplayStyle::Inline) {
+                        Ok(mathml) => out.push_str(&mathml),
+                        Err(_) => {
+                            out.push_str("<code>");
+                            out.push_str(&escape_html(&latex));
+                            out.push_str("</code>");
+                        }
+                    }
+                }
+                #[cfg(not(feature = "math"))]
+                {
+                    out.push('$');
+                    out.push_str(&escape_html(&latex));
+                    out.push('$');
+                }
+                i = j + 1;
+                continue;
+            }
         }
 
         // Image: ![alt](url)
@@ -267,6 +341,7 @@ enum BlockState {
     FencedCode(String), // language
     IndentedCode,
     Blockquote,
+    DisplayMath,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -442,6 +517,47 @@ fn render_body(source: &str) -> String {
             }
         }
 
+        // Inside display math block
+        if state == BlockState::DisplayMath {
+            if trimmed == "$$" {
+                // Close display math
+                let latex = code_buf.trim().to_string();
+                code_buf.clear();
+                state = BlockState::None;
+                if latex.is_empty() {
+                    out.push_str("<p>$$$$</p>\n");
+                } else {
+                    #[cfg(feature = "math")]
+                    {
+                        match latex2mathml::latex_to_mathml(&latex, latex2mathml::DisplayStyle::Block) {
+                            Ok(mathml) => {
+                                out.push_str(&mathml);
+                                out.push('\n');
+                            }
+                            Err(_) => {
+                                out.push_str("<pre><code>");
+                                out.push_str(&escape_html(&latex));
+                                out.push_str("</code></pre>\n");
+                            }
+                        }
+                    }
+                    #[cfg(not(feature = "math"))]
+                    {
+                        out.push_str("<p>$$");
+                        out.push_str(&escape_html(&latex));
+                        out.push_str("$$</p>\n");
+                    }
+                }
+            } else {
+                if !code_buf.is_empty() {
+                    code_buf.push('\n');
+                }
+                code_buf.push_str(trimmed);
+            }
+            i += 1;
+            continue;
+        }
+
         // Blank line
         if trimmed.is_empty() {
             flush_paragraph(&mut out, &mut para_buf, &mut state);
@@ -468,6 +584,52 @@ fn render_body(source: &str) -> String {
                 ));
             }
             state = BlockState::FencedCode(lang);
+            i += 1;
+            continue;
+        }
+
+        // Display math block start: $$ at start of line
+        if trimmed.starts_with("$$") {
+            flush_paragraph(&mut out, &mut para_buf, &mut state);
+            close_all_lists(&mut out, &mut list_stack);
+            let rest_of_line = trimmed[2..].trim();
+            if rest_of_line.ends_with("$$") && rest_of_line.len() >= 2 {
+                // Single-line: $$content$$
+                let latex = rest_of_line[..rest_of_line.len() - 2].trim();
+                if latex.is_empty() {
+                    out.push_str("<p>$$$$</p>\n");
+                } else {
+                    #[cfg(feature = "math")]
+                    {
+                        match latex2mathml::latex_to_mathml(latex, latex2mathml::DisplayStyle::Block) {
+                            Ok(mathml) => {
+                                out.push_str(&mathml);
+                                out.push('\n');
+                            }
+                            Err(_) => {
+                                out.push_str("<pre><code>");
+                                out.push_str(&escape_html(latex));
+                                out.push_str("</code></pre>\n");
+                            }
+                        }
+                    }
+                    #[cfg(not(feature = "math"))]
+                    {
+                        out.push_str("<p>$$");
+                        out.push_str(&escape_html(latex));
+                        out.push_str("$$</p>\n");
+                    }
+                }
+            } else if rest_of_line.is_empty() {
+                // Multi-line: opening $$
+                state = BlockState::DisplayMath;
+                code_buf.clear();
+            } else {
+                // $$ followed by content but no closing $$ on same line — start multi-line
+                state = BlockState::DisplayMath;
+                code_buf.clear();
+                code_buf.push_str(rest_of_line);
+            }
             i += 1;
             continue;
         }
@@ -825,8 +987,10 @@ mod tests {
     fn test_wrap_html_page_uses_link_not_inline() {
         let page = wrap_html_page("Test", "", false);
         assert!(page.contains("<link"));
-        assert!(!page.contains("<style>"));
+        // Main CSS is served via <link>, not inline <style>
         assert!(!page.contains("@import"));
+        #[cfg(not(feature = "math"))]
+        assert!(!page.contains("<style>"));
     }
 
     #[test]
@@ -1412,6 +1576,7 @@ mod tests {
     fn test_wrap_html_page_uses_query_string_assets() {
         let page = wrap_html_page("Title", "<p>hi</p>", false);
         assert!(page.contains("<link rel=\"stylesheet\" href=\"/?css\">"));
+        #[cfg(not(feature = "math"))]
         assert!(!page.contains("<style>"));
     }
 
@@ -1433,5 +1598,109 @@ mod tests {
         assert_eq!(CSS_GZ[1], 0x8b);
         assert_eq!(HLJS_JS_GZ[0], 0x1f);
         assert_eq!(HLJS_JS_GZ[1], 0x8b);
+    }
+
+    // T003: Inline math produces MathML (math feature) or plain text (no feature)
+    #[cfg(feature = "math")]
+    #[test]
+    fn test_inline_math_renders_mathml() {
+        let result = render_inline("$E = mc^2$");
+        assert!(result.contains("<math"), "expected MathML output, got: {}", result);
+    }
+
+    #[cfg(not(feature = "math"))]
+    #[test]
+    fn test_inline_math_passthrough_without_feature() {
+        let result = render_inline("$E = mc^2$");
+        assert!(result.contains("$E = mc^2$"), "expected raw LaTeX, got: {}", result);
+    }
+
+    // T004: Space rule — $5 is NOT math, $x^2$ IS math
+    #[test]
+    fn test_dollar_space_rule_no_false_positive() {
+        let result = render_inline("Price is $5 and $10");
+        // $ followed by digit+space: the closing $ would need no space before it
+        // "5 and " has space before next $, so no match
+        assert!(!result.contains("<math"), "currency should not be math: {}", result);
+    }
+
+    #[cfg(feature = "math")]
+    #[test]
+    fn test_dollar_valid_math_no_spaces() {
+        let result = render_inline("$x^2$");
+        assert!(result.contains("<math"), "valid math should render: {}", result);
+    }
+
+    // T005: $ inside code span is not math
+    #[test]
+    fn test_dollar_inside_code_span_not_math() {
+        let result = render_inline("`$x$`");
+        assert!(result.contains("<code>$x$</code>"), "code span should take priority: {}", result);
+        assert!(!result.contains("<math"), "should not contain math: {}", result);
+    }
+
+    // T007: Escaped dollar sign renders as literal $
+    #[test]
+    fn test_escaped_dollar_is_literal() {
+        let result = render_inline("\\$100");
+        assert!(result.contains("$100"), "escaped dollar should be literal: {}", result);
+        assert!(!result.contains("<math"), "should not be math: {}", result);
+        assert!(!result.contains("\\$"), "backslash should be consumed: {}", result);
+    }
+
+    // Dollar sign inside later backtick span must not close an earlier $
+    #[test]
+    fn test_dollar_before_backtick_span_with_dollar() {
+        let result = render_inline("costs $5 and `$` works");
+        assert!(!result.contains("<math"), "should not be math: {}", result);
+        assert!(result.contains("$5"), "currency should pass through: {}", result);
+        assert!(result.contains("<code>$</code>"), "code span preserved: {}", result);
+    }
+
+    // T008: Display math $$ produces block MathML or plain text
+    #[cfg(feature = "math")]
+    #[test]
+    fn test_display_math_renders_block_mathml() {
+        let result = render_body("$$\\sum x$$\n");
+        assert!(result.contains("<math"), "expected MathML: {}", result);
+        assert!(result.contains("display=\"block\""), "expected block display: {}", result);
+    }
+
+    #[cfg(not(feature = "math"))]
+    #[test]
+    fn test_display_math_passthrough_without_feature() {
+        let result = render_body("$$\\sum x$$\n");
+        assert!(result.contains("$$"), "expected raw $$: {}", result);
+    }
+
+    // T009: Multi-line display math
+    #[cfg(feature = "math")]
+    #[test]
+    fn test_display_math_multiline() {
+        let result = render_body("$$\n\\frac{a}{b}\n$$\n");
+        assert!(result.contains("<math"), "expected MathML: {}", result);
+        assert!(result.contains("display=\"block\""), "expected block: {}", result);
+    }
+
+    // T010: $$ inside fenced code is NOT math
+    #[test]
+    fn test_display_math_inside_fenced_code_not_math() {
+        let result = render_body("```\n$$x$$\n```\n");
+        assert!(result.contains("$$x$$"), "should be code content: {}", result);
+        assert!(result.contains("<pre><code>"), "should be code block: {}", result);
+        assert!(!result.contains("<math"), "should not contain math: {}", result);
+    }
+
+    // T012: Empty $$ passed through as literal
+    #[test]
+    fn test_empty_display_math_passthrough() {
+        let result = render_body("$$$$\n");
+        assert!(!result.contains("<math"), "empty $$ should not be math: {}", result);
+    }
+
+    #[test]
+    fn test_empty_display_math_multiline_passthrough() {
+        let result = render_body("$$\n$$\n");
+        assert!(!result.contains("<math"), "empty $$ block should not be math: {}", result);
     }
 }
