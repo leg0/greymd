@@ -66,6 +66,7 @@ pub struct HttpResponse {
     pub status_text: &'static str,
     pub content_type: &'static str,
     pub content_encoding: Option<&'static str>,
+    pub location: Option<String>,
     pub body: Vec<u8>,
 }
 
@@ -76,6 +77,7 @@ impl HttpResponse {
             status_text: "OK",
             content_type,
             content_encoding: None,
+            location: None,
             body,
         }
     }
@@ -86,6 +88,7 @@ impl HttpResponse {
             status_text: "OK",
             content_type,
             content_encoding: Some("gzip"),
+            location: None,
             body,
         }
     }
@@ -96,6 +99,7 @@ impl HttpResponse {
             status_text: "Not Found",
             content_type: "text/html",
             content_encoding: None,
+            location: None,
             body: b"<h1>404 Not Found</h1>".to_vec(),
         }
     }
@@ -106,7 +110,19 @@ impl HttpResponse {
             status_text: "Method Not Allowed",
             content_type: "text/html",
             content_encoding: None,
+            location: None,
             body: b"<h1>405 Method Not Allowed</h1>".to_vec(),
+        }
+    }
+
+    pub fn redirect(location: &str) -> Self {
+        Self {
+            status_code: 302,
+            status_text: "Found",
+            content_type: "text/html",
+            content_encoding: None,
+            location: Some(location.to_string()),
+            body: Vec::new(),
         }
     }
 
@@ -120,6 +136,9 @@ impl HttpResponse {
         );
         if let Some(enc) = self.content_encoding {
             header.push_str(&format!("Content-Encoding: {}\r\n", enc));
+        }
+        if let Some(ref loc) = self.location {
+            header.push_str(&format!("Location: {}\r\n", loc));
         }
         header.push_str("\r\n");
         let mut bytes = header.into_bytes();

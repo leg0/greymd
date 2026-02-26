@@ -55,17 +55,17 @@ fn serve_file(file_path: &Path, has_custom_css: bool) -> HttpResponse {
 fn serve_directory(dir_path: &Path, root: &Path, url_path: &str, has_custom_css: bool) -> HttpResponse {
     let entries = listing::collect_entries(dir_path);
 
-    // Auto-serve: single .md file
+    // Auto-serve: single .md file → redirect so browser URL matches the file
     let md_files: Vec<&listing::DirectoryEntry> = entries.iter().filter(|e| !e.is_dir).collect();
     if md_files.len() == 1 {
-        let file_path = dir_path.join(&md_files[0].name);
-        return serve_file(&file_path, has_custom_css);
+        let target = format!("{}{}", if url_path.ends_with('/') { url_path.to_string() } else { format!("{url_path}/") }, &md_files[0].name);
+        return HttpResponse::redirect(&target);
     }
 
-    // Auto-serve: index.md when multiple .md files
+    // Auto-serve: index.md when multiple .md files → redirect
     if md_files.len() > 1 && md_files.iter().any(|e| e.name == "index.md") {
-        let file_path = dir_path.join("index.md");
-        return serve_file(&file_path, has_custom_css);
+        let target = format!("{}index.md", if url_path.ends_with('/') { url_path.to_string() } else { format!("{url_path}/") });
+        return HttpResponse::redirect(&target);
     }
 
     // Fall back to listing
@@ -312,10 +312,10 @@ mod tests {
         std::fs::create_dir(dir.path().join("docs")).unwrap();
 
         let port = start_server(dir.path());
-        // Only one .md file → auto-serve it
+        // Only one .md file → redirect to it
         let resp = get(port, "/");
-        assert!(resp.contains("HTTP/1.1 200 OK"));
-        assert!(resp.contains("id=\"readme\""));
+        assert!(resp.contains("HTTP/1.1 302 Found"));
+        assert!(resp.contains("Location: /readme.md"));
     }
 
     #[test]
@@ -342,8 +342,8 @@ mod tests {
 
         let port = start_server(dir.path());
         let resp = get(port, "/");
-        assert!(resp.contains("HTTP/1.1 200 OK"));
-        assert!(resp.contains("id=\"welcome\""));
+        assert!(resp.contains("HTTP/1.1 302 Found"));
+        assert!(resp.contains("Location: /index.md"));
     }
 
     #[test]
@@ -367,7 +367,8 @@ mod tests {
 
         let port = start_server(dir.path());
         let resp = get(port, "/docs/");
-        assert!(resp.contains("id=\"only\""));
+        assert!(resp.contains("HTTP/1.1 302 Found"));
+        assert!(resp.contains("Location: /docs/only.md"));
     }
 
     #[test]
