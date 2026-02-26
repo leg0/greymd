@@ -160,3 +160,31 @@ ___
 | Path resolver | ~170 | `path.rs` |
 | Directory listing | ~190 | `listing.rs` |
 | Server | ~620 | `server.rs` |
+
+---
+
+## Path Auto-Linking
+
+Paths to `.md` files and directories are automatically converted to clickable links.
+
+### These should be linked
+
+- See math-demo.md for a math rendering demo.
+- The project ../README.md is at the repo root.
+- Check out the themes/ subdirectory for theme examples.
+- This file is ./demo.md relative to itself.
+
+### These should NOT be linked
+
+- The file highlight.js provides syntax highlighting.
+- Edit src/main.rs to change the entry point.
+- Config is in Cargo.toml at the root.
+- Fractions like 1/2 and phrases like and/or are left alone.
+- Prices like $1.20 are not affected either.
+- Tokens like hello/world without an extension stay plain.
+
+### In code spans
+
+- `math-demo.md` — path-only code span becomes clickable.
+- `main.rs` — non-`.md` code span stays plain.
+- `cargo run math-demo.md` — code span with extra text stays plain.

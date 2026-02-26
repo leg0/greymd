@@ -38,6 +38,7 @@ The server tries port 8080 first, then falls back to a random available port if 
 - Task lists (`- [ ]`, `- [x]`)
 - Blockquotes (`>`)
 - [Links](url) and ![images](url), with auto-linking of bare URLs
+- **Path auto-linking** — relative `.md` file paths like `docs/guide.md` and directory paths like `examples/` in prose automatically become clickable links
 - GFM-style tables with column alignment
 - Horizontal rules (`---`, `***`, `___`)
 

@@ -90,9 +90,27 @@ fn render_inline(text: &str) -> String {
                 if code_text.starts_with(' ') && code_text.ends_with(' ') && code_text.len() > 1 {
                     code_text = code_text[1..code_text.len() - 1].to_string();
                 }
-                out.push_str("<code>");
-                out.push_str(&escape_html(&code_text));
-                out.push_str("</code>");
+                // If the code span contains only a path, make it a clickable link
+                let code_chars: Vec<char> = code_text.chars().collect();
+                let is_path_only = if !code_chars.is_empty()
+                    && (code_chars[0].is_ascii_alphabetic() || code_chars[0] == '.')
+                {
+                    try_parse_path(&code_chars, 0)
+                        .is_some_and(|p| p.len() == code_text.len())
+                } else {
+                    false
+                };
+                if is_path_only {
+                    out.push_str(&format!(
+                        "<code><a href=\"{}\">{}</a></code>",
+                        escape_html(&code_text),
+                        escape_html(&code_text)
+                    ));
+                } else {
+                    out.push_str("<code>");
+                    out.push_str(&escape_html(&code_text));
+                    out.push_str("</code>");
+                }
                 i = j + ticks;
                 continue;
             }
@@ -269,6 +287,19 @@ fn render_inline(text: &str) -> String {
             continue;
         }
 
+        // Auto-link: relative file paths (e.g., src/main.rs, README.md)
+        if (chars[i].is_ascii_alphabetic() || chars[i] == '.')
+            && let Some(path) = try_parse_path(&chars, i)
+        {
+            out.push_str(&format!(
+                "<a href=\"{}\">{}</a>",
+                escape_html(&path),
+                escape_html(&path)
+            ));
+            i += path.len();
+            continue;
+        }
+
         // Regular character — escape HTML
         match chars[i] {
             '<' => out.push_str("&lt;"),
@@ -318,6 +349,46 @@ fn try_parse_url(chars: &[char], start: usize) -> Option<String> {
         return None;
     }
     Some(url.to_string())
+}
+
+fn try_parse_path(chars: &[char], start: usize) -> Option<String> {
+    // If starting with '.', require next char to be '/' (for ./ or ../ prefixes)
+    if chars[start] == '.' {
+        let next = start + 1;
+        if next >= chars.len() || chars[next] != '/' && !(chars[next] == '.' && next + 1 < chars.len() && chars[next + 1] == '/') {
+            return None;
+        }
+    }
+    // Scan forward consuming path characters
+    let mut j = start;
+    while j < chars.len() {
+        let c = chars[j];
+        if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' || c == '/' {
+            j += 1;
+        } else {
+            break;
+        }
+    }
+    if j == start {
+        return None;
+    }
+    let raw: String = chars[start..j].iter().collect();
+    // Strip trailing punctuation
+    let path = raw.trim_end_matches(|c: char| ".,;:!?)".contains(c));
+    if path.is_empty() {
+        return None;
+    }
+    // Validate: must end with `/` OR last segment must end with `.md`
+    if path.ends_with('/') {
+        return Some(path.to_string());
+    }
+    if path.ends_with(".md") {
+        let last_segment = path.rsplit('/').next().unwrap_or(path);
+        if last_segment.len() >= 4 && last_segment.ends_with(".md") {
+            return Some(path.to_string());
+        }
+    }
+    None
 }
 
 fn parse_link_or_image(chars: &[char], bracket_start: usize) -> Option<(String, String, usize)> {
@@ -1210,6 +1281,193 @@ mod tests {
     fn test_autolink_http() {
         let body = render_body("http://example.com works too");
         assert!(body.contains("<a href=\"http://example.com\">http://example.com</a>"));
+    }
+
+    // === Path auto-linking (US1: basic) ===
+
+    #[test]
+    fn test_path_autolink_multi_segment() {
+        let body = render_body("See examples/math-demo.md for details.");
+        assert!(body.contains("<a href=\"examples/math-demo.md\">examples/math-demo.md</a>"));
+    }
+
+    #[test]
+    fn test_path_autolink_src_file() {
+        // .rs is not auto-linked under .md-only rule
+        let body = render_body("Edit src/main.rs to change the entry point.");
+        assert!(!body.contains("<a href=\"src/main.rs\">"), "src/main.rs should not be linked: {body}");
+    }
+
+    #[test]
+    fn test_path_autolink_dot_slash() {
+        let body = render_body("Look at ./README.md here.");
+        assert!(body.contains("<a href=\"./README.md\">./README.md</a>"));
+    }
+
+    #[test]
+    fn test_path_autolink_dot_dot_slash() {
+        let body = render_body("The parent ../docs/guide.md has details.");
+        assert!(body.contains("<a href=\"../docs/guide.md\">../docs/guide.md</a>"));
+    }
+
+    #[test]
+    fn test_path_autolink_trailing_slash_directory() {
+        let body = render_body("Check src/utils/ for helpers.");
+        assert!(body.contains("<a href=\"src/utils/\">src/utils/</a>"));
+    }
+
+    #[test]
+    fn test_path_autolink_single_segment_filename() {
+        let body = render_body("See README.md for info.");
+        assert!(body.contains("<a href=\"README.md\">README.md</a>"));
+    }
+
+    // === Path auto-linking (US2: non-interference) ===
+
+    #[test]
+    fn test_path_code_span_only_path_is_linked() {
+        // .md code span is linked
+        let body = render_body("Run `docs/setup.md` to start.");
+        assert!(body.contains("<code><a href=\"docs/setup.md\">docs/setup.md</a></code>"));
+    }
+
+    #[test]
+    fn test_path_code_span_with_extra_text_not_linked() {
+        let body = render_body("Run `src/main.rs --verbose` to start.");
+        assert!(body.contains("<code>src/main.rs --verbose</code>"));
+        assert!(!body.contains("<a href"));
+    }
+
+    #[test]
+    fn test_path_not_double_linked_in_explicit_link() {
+        let body = render_body("[click here](src/main.rs) for details.");
+        assert!(body.contains("<a href=\"src/main.rs\">click here</a>"));
+        // Should NOT have a second auto-linked occurrence
+        let count = body.matches("<a href=\"src/main.rs\">").count();
+        assert_eq!(count, 1, "path should not be double-linked: {body}");
+    }
+
+    #[test]
+    fn test_path_not_linked_after_url() {
+        let body = render_body("Visit https://example.com/path/to/file.md for more.");
+        assert!(body.contains("<a href=\"https://example.com/path/to/file.md\">"));
+        // The /path/to/file.md should NOT be separately linked
+        assert!(!body.contains("<a href=\"/path/to/file.md\">"));
+    }
+
+    #[test]
+    fn test_path_not_linked_in_image() {
+        let body = render_body("![diagram](images/arch.png) shows the design.");
+        assert!(body.contains("<img src=\"images/arch.png\""));
+        // images/arch.png should NOT also appear as a text link
+        assert!(!body.contains("<a href=\"images/arch.png\">"));
+    }
+
+    // === Path auto-linking (US3: edge cases) ===
+
+    #[test]
+    fn test_path_trailing_period_excluded() {
+        let body = render_body("Check docs/setup.md.");
+        assert!(body.contains("<a href=\"docs/setup.md\">docs/setup.md</a>."));
+    }
+
+    #[test]
+    fn test_path_in_parentheses() {
+        let body = render_body("(see docs/guide.md)");
+        assert!(body.contains("<a href=\"docs/guide.md\">docs/guide.md</a>"));
+        assert!(!body.contains("(<a"));  // opening paren should be outside link
+    }
+
+    #[test]
+    fn test_path_multiple_on_one_line() {
+        let body = render_body("docs/a.md, docs/b.md, and docs/c.md");
+        assert!(body.contains("<a href=\"docs/a.md\">docs/a.md</a>"));
+        assert!(body.contains("<a href=\"docs/b.md\">docs/b.md</a>"));
+        assert!(body.contains("<a href=\"docs/c.md\">docs/c.md</a>"));
+    }
+
+    #[test]
+    fn test_path_hello_world_not_linked() {
+        let body = render_body("Say hello/world to everyone.");
+        assert!(!body.contains("<a href=\"hello/world\">"));
+    }
+
+    #[test]
+    fn test_path_fraction_not_linked() {
+        let body = render_body("Use 1/2 cup of flour.");
+        assert!(!body.contains("<a href"));
+    }
+
+    #[test]
+    fn test_path_and_or_not_linked() {
+        let body = render_body("Choose and/or select.");
+        assert!(!body.contains("<a href"));
+    }
+
+    #[test]
+    fn test_path_eg_not_linked() {
+        let body = render_body("For example e.g. this works.");
+        assert!(!body.contains("<a href=\"e.g\">"), "e.g should not be linked: {body}");
+    }
+
+    #[test]
+    fn test_path_dollar_amount_not_linked() {
+        let body = render_body("costs $1.20 each");
+        assert!(!body.contains("<a "), "$1.20 should not be linked: {body}");
+        assert!(body.contains("$1.20"), "dollar amount preserved: {body}");
+    }
+
+    #[test]
+    fn test_path_dot_prefix_requires_slash() {
+        let body = render_body("see ./docs/intro.md here");
+        assert!(body.contains("<a href=\"./docs/intro.md\">./docs/intro.md</a>"), "{body}");
+        let body2 = render_body("see ../README.md here");
+        assert!(body2.contains("<a href=\"../README.md\">../README.md</a>"), "{body2}");
+    }
+
+    #[test]
+    fn test_path_in_heading() {
+        let body = render_body("# See docs/intro.md");
+        assert!(body.contains("<a href=\"docs/intro.md\">docs/intro.md</a>"));
+    }
+
+    // === Path auto-linking: .md-only restriction ===
+
+    #[test]
+    fn test_path_non_md_extension_not_linked() {
+        let body = render_body("The file highlight.js provides highlighting.");
+        assert!(!body.contains("<a href"), "highlight.js should not be linked: {body}");
+    }
+
+    #[test]
+    fn test_path_rs_extension_not_linked() {
+        let body = render_body("Edit src/main.rs to change the entry.");
+        assert!(!body.contains("<a href=\"src/main.rs\">"), "src/main.rs should not be linked: {body}");
+    }
+
+    #[test]
+    fn test_path_toml_extension_not_linked() {
+        let body = render_body("Config is in Cargo.toml at the root.");
+        assert!(!body.contains("<a href"), "Cargo.toml should not be linked: {body}");
+    }
+
+    #[test]
+    fn test_path_md_extension_is_linked() {
+        let body = render_body("Read docs/setup.md for config.");
+        assert!(body.contains("<a href=\"docs/setup.md\">docs/setup.md</a>"), "{body}");
+    }
+
+    #[test]
+    fn test_path_code_span_md_only_is_linked() {
+        let body = render_body("Run `examples/math-demo.md` to see.");
+        assert!(body.contains("<code><a href=\"examples/math-demo.md\">examples/math-demo.md</a></code>"), "{body}");
+    }
+
+    #[test]
+    fn test_path_code_span_non_md_not_linked() {
+        let body = render_body("See `src/main.rs` for details.");
+        assert!(!body.contains("<a href"), "non-.md code span should not be linked: {body}");
+        assert!(body.contains("<code>src/main.rs</code>"), "{body}");
     }
 
     // === Task lists ===
