@@ -20,6 +20,11 @@ fn bind_listener() -> TcpListener {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("greymd {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
     if args.iter().any(|a| a == "--help" || a == "-h") {
         print_usage();
         return;
@@ -166,6 +171,8 @@ fn print_themes(names: &[String], themes_dir: &Path) {
 }
 
 fn print_usage() {
+    println!("greymd {}", env!("CARGO_PKG_VERSION"));
+    println!();
     println!("Usage: greymd [options] [directory]");
     println!();
     println!("Serve files from a directory over HTTP on localhost.");
@@ -177,6 +184,7 @@ fn print_usage() {
     println!("  --theme <name>         Use a bundled theme (warns and falls back to");
     println!("                         default if theme not found)");
     println!("  --list-themes          List available themes");
+    println!("  -V, --version          Print version information");
     println!("  -h, --help             Show this help message");
     println!();
     println!("Customization:");
