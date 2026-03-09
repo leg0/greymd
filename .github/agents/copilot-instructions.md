@@ -19,6 +19,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-20
 - Rust edition 2024 (rustc 1.85+) + None (std only); `latex2mathml` optional behind `math` feature; `miniz_oxide` build-time only (011-math-rendering)
 - N/A (server-side conversion, no storage) (011-math-rendering)
 - Rust 1.85+ (edition 2024) + None (std only) (013-path-auto-linking)
+- Rust, edition 2024 (Cargo.toml) + None (stdlib only; `latex2mathml` optional for math feature) (014-auto-open-browser)
 
 - Rust 2024 edition (rustc 1.85+) + None (zero external crates per constitution) (001-static-file-server)
 
@@ -38,9 +39,9 @@ cargo test [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECH
 Rust 2024 edition (rustc 1.85+): Follow standard conventions
 
 ## Recent Changes
+- 014-auto-open-browser: Added Rust, edition 2024 (Cargo.toml) + None (stdlib only; `latex2mathml` optional for math feature)
 - 013-path-auto-linking: Added Rust 1.85+ (edition 2024) + None (std only)
 - 013-path-auto-linking: Added Rust 1.85+ (edition 2024) + None (std only)
-- 011-math-rendering: Added Rust edition 2024 (rustc 1.85+) + None (std only); `latex2mathml` optional behind `math` feature; `miniz_oxide` build-time only
 
 
 <!-- MANUAL ADDITIONS START -->

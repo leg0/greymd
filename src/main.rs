@@ -1,3 +1,4 @@
+mod browser;
 mod http;
 mod listing;
 mod markdown;
@@ -35,10 +36,12 @@ fn main() {
         return;
     }
 
+    let no_browser = args.iter().any(|a| a == "--no-browser");
+
     // Parse --theme <name>
     let theme_name = args.windows(2).find(|w| w[0] == "--theme").map(|w| w[1].clone());
 
-    // Collect positional args (skip --theme and its value)
+    // Collect positional args (skip --theme and its value, --list-themes, --no-browser)
     let mut positional = Vec::new();
     let mut skip_next = false;
     for arg in &args[1..] {
@@ -50,7 +53,7 @@ fn main() {
             skip_next = true;
             continue;
         }
-        if arg == "--list-themes" {
+        if arg == "--list-themes" || arg == "--no-browser" {
             continue;
         }
         positional.push(arg.clone());
@@ -83,6 +86,10 @@ fn main() {
     let listener = bind_listener();
     let addr = listener.local_addr().unwrap();
     println!("Listening on http://{}", addr);
+
+    if !no_browser {
+        browser::open(&format!("http://{}", addr));
+    }
 
     server::start(listener, &root, css_path, js_path);
 }
@@ -184,6 +191,7 @@ fn print_usage() {
     println!("  --theme <name>         Use a bundled theme (warns and falls back to");
     println!("                         default if theme not found)");
     println!("  --list-themes          List available themes");
+    println!("  --no-browser           Do not open the default browser on startup");
     println!("  -V, --version          Print version information");
     println!("  -h, --help             Show this help message");
     println!();
@@ -362,5 +370,43 @@ mod tests {
     fn collect_themes_missing_dir_returns_empty() {
         let names = collect_themes(Path::new("/nonexistent/themes"));
         assert!(names.is_empty());
+    }
+
+    #[test]
+    fn url_format_matches_listener_address() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let url = format!("http://{}", addr);
+        assert!(url.starts_with("http://127.0.0.1:"));
+        let port_str = url.rsplit(':').next().unwrap();
+        let port: u16 = port_str.parse().expect("port should be a valid u16");
+        assert_eq!(port, addr.port());
+    }
+
+    #[test]
+    fn no_browser_flag_detected() {
+        let args = vec!["greymd".to_string(), "--no-browser".to_string()];
+        assert!(args.iter().any(|a| a == "--no-browser"));
+    }
+
+    #[test]
+    fn no_browser_flag_absent_defaults_false() {
+        let args = vec!["greymd".to_string(), "./docs".to_string()];
+        assert!(!args.iter().any(|a| a == "--no-browser"));
+    }
+
+    #[test]
+    fn no_browser_flag_filtered_from_positional_args() {
+        let args: Vec<String> = vec!["greymd", "--no-browser", "./docs"]
+            .into_iter().map(String::from).collect();
+        let mut positional = Vec::new();
+        let mut skip_next = false;
+        for arg in &args[1..] {
+            if skip_next { skip_next = false; continue; }
+            if arg == "--theme" { skip_next = true; continue; }
+            if arg == "--list-themes" || arg == "--no-browser" { continue; }
+            positional.push(arg.clone());
+        }
+        assert_eq!(positional, vec!["./docs"]);
     }
 }

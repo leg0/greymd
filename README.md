@@ -22,9 +22,11 @@ If you want a simple, fast, self-contained way to read markdown in a browser, gr
 greymd [options] [directory]
 ```
 
-Opens an HTTP server on `localhost` serving the contents of `directory` (defaults to the current directory). Navigate to any `.md` file path in your browser to see it rendered as HTML.
+Opens an HTTP server on `localhost` serving the contents of `directory` (defaults to the current directory). Your default browser opens automatically to the server's URL.
 
 The server tries port 8080 first, then falls back to a random available port if 8080 is busy. The actual address is printed at startup.
+
+Use `--no-browser` to suppress the automatic browser launch (useful for scripts, remote servers, or when running multiple instances).
 
 ## Features
 
