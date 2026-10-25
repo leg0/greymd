@@ -424,6 +424,8 @@ enum ListKind {
 struct ListEntry {
     kind: ListKind,
     indent: usize,
+    content_indent: usize,
+    text: String,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -750,7 +752,14 @@ fn render_body(source: &str) -> String {
         // Unordered list item
         if let Some((indent, text)) = parse_unordered_list_item(line) {
             flush_paragraph(&mut out, &mut para_buf, &mut state);
-            handle_list_item(&mut out, &mut list_stack, ListKind::Unordered, indent, text);
+            handle_list_item(
+                &mut out,
+                &mut list_stack,
+                ListKind::Unordered,
+                indent,
+                line.len() - text.len(),
+                text,
+            );
             i += 1;
             continue;
         }
@@ -758,7 +767,14 @@ fn render_body(source: &str) -> String {
         // Ordered list item
         if let Some((indent, text)) = parse_ordered_list_item(line) {
             flush_paragraph(&mut out, &mut para_buf, &mut state);
-            handle_list_item(&mut out, &mut list_stack, ListKind::Ordered, indent, text);
+            handle_list_item(
+                &mut out,
+                &mut list_stack,
+                ListKind::Ordered,
+                indent,
+                line.len() - text.len(),
+                text,
+            );
             i += 1;
             continue;
         }
@@ -791,6 +807,19 @@ fn render_body(source: &str) -> String {
             }
             out.push_str(&render_table(header, separator, &data_rows));
             i = j;
+            continue;
+        }
+
+        // A soft-wrapped line continues the current list item's inline text.
+        if !list_stack.is_empty() {
+            let indent = line.len() - line.trim_start().len();
+            while list_stack.len() > 1 && indent < list_stack.last().unwrap().content_indent {
+                close_list_top(&mut out, &mut list_stack);
+            }
+            let entry = list_stack.last_mut().unwrap();
+            entry.text.push('\n');
+            entry.text.push_str(trimmed.trim_start());
+            i += 1;
             continue;
         }
 
@@ -916,6 +945,7 @@ fn handle_list_item(
     stack: &mut Vec<ListEntry>,
     kind: ListKind,
     indent: usize,
+    content_indent: usize,
     text: &str,
 ) {
     // Close deeper lists
@@ -928,7 +958,18 @@ fn handle_list_item(
         }
     }
 
+    if stack
+        .last()
+        .is_some_and(|entry| indent <= entry.indent && kind != entry.kind)
+    {
+        close_list_top(out, stack);
+    }
+
     if stack.is_empty() || indent > stack.last().unwrap().indent {
+        if let Some(parent) = stack.last_mut() {
+            flush_list_text(out, parent);
+            out.push('\n');
+        }
         // Open new list level
         let tag = if kind == ListKind::Unordered {
             "<ul>\n"
@@ -936,30 +977,44 @@ fn handle_list_item(
             "<ol>\n"
         };
         out.push_str(tag);
-        stack.push(ListEntry { kind, indent });
+        stack.push(ListEntry {
+            kind,
+            indent,
+            content_indent,
+            text: String::new(),
+        });
+    } else {
+        flush_list_text(out, stack.last_mut().unwrap());
+        out.push_str("</li>\n");
     }
 
+    let entry = stack.last_mut().unwrap();
+    entry.content_indent = content_indent;
+    out.push_str("<li>");
     // Task list items: - [ ] or - [x]
     if let Some(rest) = text.strip_prefix("[ ] ") {
-        out.push_str(&format!(
-            "<li><input type=\"checkbox\" disabled> {}</li>\n",
-            render_inline(rest)
-        ));
+        out.push_str("<input type=\"checkbox\" disabled> ");
+        entry.text.push_str(rest);
     } else if let Some(rest) = text
         .strip_prefix("[x] ")
         .or_else(|| text.strip_prefix("[X] "))
     {
-        out.push_str(&format!(
-            "<li><input type=\"checkbox\" checked disabled> {}</li>\n",
-            render_inline(rest)
-        ));
+        out.push_str("<input type=\"checkbox\" checked disabled> ");
+        entry.text.push_str(rest);
     } else {
-        out.push_str(&format!("<li>{}</li>\n", render_inline(text)));
+        entry.text.push_str(text);
     }
 }
 
+fn flush_list_text(out: &mut String, entry: &mut ListEntry) {
+    out.push_str(&render_inline(&entry.text));
+    entry.text.clear();
+}
+
 fn close_list_top(out: &mut String, stack: &mut Vec<ListEntry>) {
-    if let Some(entry) = stack.pop() {
+    if let Some(mut entry) = stack.pop() {
+        flush_list_text(out, &mut entry);
+        out.push_str("</li>\n");
         let tag = if entry.kind == ListKind::Unordered {
             "</ul>\n"
         } else {
@@ -1543,6 +1598,61 @@ mod tests {
         assert!(body.contains("</ul>"));
     }
 
+    #[test]
+    fn test_list_wrapped_item_keeps_following_siblings() {
+        let body = render_body(
+            "- The meaning of any `Ret` value, of any function, or of any handle type.\n\
+             - API names other than those in the header and config (no hard-coded\n  \
+             function, type or value names).\n\
+             - Processes, launching, the handshake, the platform.\n\
+             - Whether references are counted locally (layer 3).\n",
+        );
+        assert_eq!(
+            body,
+            "<ul>\n\
+             <li>The meaning of any <code>Ret</code> value, of any function, or of any handle type.</li>\n\
+             <li>API names other than those in the header and config (no hard-coded\n\
+             function, type or value names).</li>\n\
+             <li>Processes, launching, the handshake, the platform.</li>\n\
+             <li>Whether references are counted locally (layer 3).</li>\n\
+             </ul>\n"
+        );
+    }
+
+    #[test]
+    fn test_list_wrapped_inline_formatting() {
+        let body = render_body("- **bold\n  continued**, `code\n  continued` and <text>");
+        assert_eq!(
+            body,
+            "<ul>\n<li><strong>bold\ncontinued</strong>, <code>code\ncontinued</code> and &lt;text&gt;</li>\n</ul>\n"
+        );
+    }
+
+    #[test]
+    fn test_list_lazy_continuation_and_paragraph_boundary() {
+        let body = render_body("- first\ncontinued\n\nOutside.");
+        assert_eq!(
+            body,
+            "<ul>\n<li>first\ncontinued</li>\n</ul>\n<p>Outside.</p>\n"
+        );
+    }
+
+    #[test]
+    fn test_list_wrapped_task_item() {
+        let body = render_body("- [x] done\n  continued\n- [ ] pending\n  continued");
+        assert_eq!(
+            body,
+            "<ul>\n<li><input type=\"checkbox\" checked disabled> done\ncontinued</li>\n\
+             <li><input type=\"checkbox\" disabled> pending\ncontinued</li>\n</ul>\n"
+        );
+    }
+
+    #[test]
+    fn test_list_continuation_ends_at_heading() {
+        let body = render_body("- item\n  continued\n# Heading");
+        assert!(body.starts_with("<ul>\n<li>item\ncontinued</li>\n</ul>\n<h1"));
+    }
+
     // === US3: Ordered lists ===
 
     #[test]
@@ -1554,18 +1664,44 @@ mod tests {
         assert!(body.contains("</ol>"));
     }
 
+    #[test]
+    fn test_list_wrapped_ordered_items() {
+        let body = render_body("1. first\n   continued\n2. second\n   continued");
+        assert_eq!(
+            body,
+            "<ol>\n<li>first\ncontinued</li>\n<li>second\ncontinued</li>\n</ol>\n"
+        );
+    }
+
     // === US3: Nested lists ===
 
     #[test]
     fn test_nested_list() {
         let body = render_body("- outer\n  - inner\n    - deep");
-        assert!(body.contains("<ul>"));
-        assert!(body.contains("<li>outer</li>"));
-        assert!(body.contains("<li>inner</li>"));
-        assert!(body.contains("<li>deep</li>"));
-        // Should have nested ul elements
-        let ul_count = body.matches("<ul>").count();
-        assert!(ul_count >= 2, "expected nested <ul>, got body: {}", body);
+        assert_eq!(
+            body,
+            "<ul>\n<li>outer\n<ul>\n<li>inner\n<ul>\n<li>deep</li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n"
+        );
+    }
+
+    #[test]
+    fn test_list_wrapped_nested_items_and_parent_continuation() {
+        let body = render_body(
+            "10. outer\n    continued\n    - inner\n      continued\n    parent again\n11. next",
+        );
+        assert_eq!(
+            body,
+            "<ol>\n<li>outer\ncontinued\n<ul>\n<li>inner\ncontinued</li>\n</ul>\n\
+             \nparent again</li>\n<li>next</li>\n</ol>\n"
+        );
+    }
+
+    #[test]
+    fn test_list_kind_change_closes_previous_list() {
+        assert_eq!(
+            render_body("- first\n1. second"),
+            "<ul>\n<li>first</li>\n</ul>\n<ol>\n<li>second</li>\n</ol>\n"
+        );
     }
 
     // === US3: Blockquote ===
